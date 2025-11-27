@@ -20,7 +20,17 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-"""Clustering pipelines"""
+"""聚类管道模块
+
+本模块实现了说话人分离中的聚类算法。
+聚类是将说话人嵌入向量分组为不同说话人的过程。
+
+主要类：
+- BaseClustering: 聚类基类
+- AgglomerativeClustering: 凝聚聚类（默认，速度快）
+- VBxClustering: 变分贝叶斯聚类（精度高）
+- OracleClustering: Oracle聚类（仅用于评估）
+"""
 
 
 import random
@@ -48,32 +58,62 @@ def filter_embeddings_by_frames(
     binary_segmentations: np.ndarray, 
     min_frames: int = 0
 ) -> np.ndarray:
-    """
-    Parameters
+    """根据干净帧数过滤嵌入向量
+    
+    只保留有足够"干净"帧（只有一个说话人活跃）的说话人片段。
+    这有助于提高聚类质量，因为重叠区域的嵌入可能不够准确。
+    
+    参数
     ----------
-    binary_segmentations : np.ndarray of shape (chunks, frames, spks)
-        1 means speaker is active, 0 means silence.
-    min_frames : int
-        Minimum number of clean frames required per speaker.
-
-    Returns
+    binary_segmentations : np.ndarray
+        二值化分割结果，形状为(chunks, frames, spks)
+        1表示说话人活跃，0表示静音
+    min_frames : int, 默认0
+        每个说话人所需的最小干净帧数
+        干净帧：只有该说话人活跃的帧（非重叠区域）
+    
+    返回
     -------
-    clean_segments : np.ndarray of shape (chunks, spks)
-        Boolean mask where True indicates the speaker has enough clean frames in the chunk.
+    np.ndarray
+        布尔掩码，形状为(chunks, spks)
+        True表示该说话人在该块中有足够的干净帧
+    
+    处理流程
+    --------
+    1. 识别只有单个说话人活跃的帧（非重叠区域）
+    2. 统计每个说话人在每个块中的干净帧数
+    3. 检查是否达到最小帧数要求
     """
-    # Mask of frames where only one speaker is active
+    # 识别只有单个说话人活跃的帧（非重叠区域）
     single_active_mask = (np.sum(binary_segmentations, axis=2, keepdims=True) == 1)
-    # Keep only frames where the speaker is the only one active
-    clean_frames = binary_segmentations * single_active_mask  # shape: (chunks, frames, spks)
-    # Count number of clean frames per chunk and speaker
-    clean_frame_counts = np.sum(clean_frames, axis=1)  # shape: (chunks, spks)
-    # Check if the count exceeds min_frames
-    clean_segments = clean_frame_counts >= min_frames  # shape: (chunks, spks)
+    # 只保留该说话人是唯一活跃说话人的帧
+    clean_frames = binary_segmentations * single_active_mask  # 形状: (chunks, frames, spks)
+    # 统计每个块和说话人的干净帧数
+    clean_frame_counts = np.sum(clean_frames, axis=1)  # 形状: (chunks, spks)
+    # 检查是否达到最小帧数要求
+    clean_segments = clean_frame_counts >= min_frames  # 形状: (chunks, spks)
 
     return clean_segments
 
 
 class BaseClustering(Pipeline):
+    """聚类基类
+    
+    所有聚类算法的基类，定义了聚类的基本接口和通用功能。
+    
+    参数
+    ----------
+    metric : str, 默认"cosine"
+        距离度量方式，用于计算嵌入向量之间的距离
+        可选："cosine"（余弦距离）、"euclidean"（欧氏距离）等
+    max_num_embeddings : int, 默认1000
+        最大嵌入向量数量
+        如果嵌入向量太多，会随机采样到此数量（用于加速）
+    constrained_assignment : bool, 默认False
+        是否使用约束分配
+        True：确保每个块中的说话人不会被分配到同一聚类
+        False：无约束（默认）
+    """
     def __init__(
         self,
         metric: str = "cosine",
@@ -81,9 +121,9 @@ class BaseClustering(Pipeline):
         constrained_assignment: bool = False,
     ):
         super().__init__()
-        self.metric = metric
-        self.max_num_embeddings = max_num_embeddings
-        self.constrained_assignment = constrained_assignment
+        self.metric = metric  # 距离度量方式
+        self.max_num_embeddings = max_num_embeddings  # 最大嵌入向量数
+        self.constrained_assignment = constrained_assignment  # 是否约束分配
 
     def set_num_clusters(
         self,
@@ -114,20 +154,39 @@ class BaseClustering(Pipeline):
         segmentations: Optional[SlidingWindowFeature] = None,
         min_frames_ratio: int = 0.1
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Filter NaN embeddings and downsample embeddings
-
-        Parameters
+        """过滤和降采样嵌入向量
+        
+        移除无效（NaN）的嵌入向量，并根据干净帧数过滤。
+        如果嵌入向量太多，会随机采样到max_num_embeddings。
+        
+        参数
         ----------
-        embeddings : (num_chunks, num_speakers, dimension) array
-            Sequence of embeddings.
-        segmentations : (num_chunks, num_frames, num_speakers) array
-            Binary segmentations.
-
-        Returns
+        embeddings : np.ndarray
+            嵌入向量序列，形状为(num_chunks, num_speakers, dimension)
+        segmentations : SlidingWindowFeature, 可选
+            二值化分割结果，形状为(num_chunks, num_frames, num_speakers)
+            用于计算干净帧数
+        min_frames_ratio : int, 默认0.1
+            最小干净帧比例（相对于总帧数）
+            例如：0.1表示至少需要10%的帧是干净的
+        
+        返回
         -------
-        filtered_embeddings : (num_embeddings, dimension) array
-        chunk_idx : (num_embeddings, ) array
-        speaker_idx : (num_embeddings, ) array
+        filtered_embeddings : np.ndarray
+            过滤后的嵌入向量，形状为(num_embeddings, dimension)
+        chunk_idx : np.ndarray
+            块索引数组，形状为(num_embeddings,)
+            指示每个嵌入向量来自哪个块
+        speaker_idx : np.ndarray
+            说话人索引数组，形状为(num_embeddings,)
+            指示每个嵌入向量来自哪个说话人
+        
+        处理流程
+        --------
+        1. 识别活跃的说话人（分割结果非零）
+        2. 识别有效的嵌入（非NaN）
+        3. 根据干净帧数过滤（如果提供了segmentations）
+        4. 如果嵌入太多，随机采样到max_num_embeddings
         """
 
         # whether speaker is active

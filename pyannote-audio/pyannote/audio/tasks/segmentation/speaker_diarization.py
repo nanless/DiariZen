@@ -59,76 +59,88 @@ Scopes = list(Scope.__args__)
 
 
 class SpeakerDiarization(SegmentationTask):
-    """Speaker diarization
-
-    Parameters
+    """说话人分离任务类
+    
+    定义说话人分离任务的训练逻辑，包括数据准备、损失计算和评估指标。
+    这是端到端说话人分离的核心任务类。
+    
+    参数
     ----------
     protocol : SpeakerDiarizationProtocol
-        pyannote.database protocol
-    cache : str, optional
-        As (meta-)data preparation might take a very long time for large datasets,
-        it can be cached to disk for later (and faster!) re-use.
-        When `cache` does not exist, `Task.prepare_data()` generates training
-        and validation metadata from `protocol` and save them to disk.
-        When `cache` exists, `Task.prepare_data()` is skipped and (meta)-data
-        are loaded from disk. Defaults to a temporary path.
-    duration : float, optional
-        Chunks duration. Defaults to 2s.
-    max_speakers_per_chunk : int, optional
-        Maximum number of speakers per chunk (must be at least 2).
-        Defaults to estimating it from the training set.
-    max_speakers_per_frame : int, optional
-        Maximum number of (overlapping) speakers per frame.
-        Setting this value to 1 or more enables `powerset multi-class` training.
-        Default behavior is to use `multi-label` training.
-    weigh_by_cardinality: bool, optional
-        Weigh each powerset classes by the size of the corresponding speaker set.
-        In other words, {0, 1} powerset class weight is 2x bigger than that of {0}
-        or {1} powerset classes. Note that empty (non-speech) powerset class is
-        assigned the same weight as mono-speaker classes. Defaults to False (i.e. use
-        same weight for every class). Has no effect with `multi-label` training.
-    warm_up : float or (float, float), optional
-        Use that many seconds on the left- and rightmost parts of each chunk
-        to warm up the model. While the model does process those left- and right-most
-        parts, only the remaining central part of each chunk is used for computing the
-        loss during training, and for aggregating scores during inference.
-        Defaults to 0. (i.e. no warm-up).
-    balance: Sequence[Text], optional
-        When provided, training samples are sampled uniformly with respect to these keys.
-        For instance, setting `balance` to ["database","subset"] will make sure that each
-        database & subset combination will be equally represented in the training samples.
-    weight: str, optional
-        When provided, use this key as frame-wise weight in loss function.
-    batch_size : int, optional
-        Number of training samples per batch. Defaults to 32.
-    num_workers : int, optional
-        Number of workers used for generating training samples.
-        Defaults to multiprocessing.cpu_count() // 2.
-    pin_memory : bool, optional
-        If True, data loaders will copy tensors into CUDA pinned
-        memory before returning them. See pytorch documentation
-        for more details. Defaults to False.
-    augmentation : BaseWaveformTransform, optional
-        torch_audiomentations waveform transform, used by dataloader
-        during training.
-    vad_loss : {"bce", "mse"}, optional
-        Add voice activity detection loss.
-        Cannot be used in conjunction with `max_speakers_per_frame`.
-    metric : optional
-        Validation metric(s). Can be anything supported by torchmetrics.MetricCollection.
-        Defaults to AUROC (area under the ROC curve).
-
-    References
+        pyannote.database协议对象，定义了数据集的结构
+    cache : str, 可选
+        数据缓存路径
+        大数据集的元数据准备可能耗时很长，可以缓存到磁盘以便快速重用
+        - cache不存在：`prepare_data()`生成并保存元数据
+        - cache存在：跳过`prepare_data()`，直接从磁盘加载
+        默认使用临时路径
+    duration : float, 默认2.0
+        音频块持续时间（秒）
+    max_speakers_per_chunk : int, 可选
+        每个块的最大说话人数（至少为2）
+        如果为None，从训练集自动估计
+    max_speakers_per_frame : int, 可选
+        每帧的最大（重叠）说话人数
+        设置此值（≥1）启用`powerset多分类`训练
+        默认行为是使用`多标签`训练
+    weigh_by_cardinality : bool, 默认False
+        是否根据说话人集合大小加权幂集类别
+        例如：{0, 1}的权重是{0}或{1}的2倍
+        注意：空集（非语音）的权重与单说话人类别相同
+        仅在`powerset`训练时有效
+    warm_up : float 或 (float, float), 默认0.0
+        预热时间（秒）
+        在每个块的左右两端使用这么多秒来预热模型
+        模型会处理这些部分，但只有中间部分用于：
+        - 训练时计算损失
+        - 推理时聚合分数
+    balance : Sequence[Text], 可选
+        平衡采样键
+        如果提供，训练样本会均匀采样这些键的组合
+        例如：["database", "subset"]确保每个数据库和子集组合均匀表示
+    weight : str, 可选
+        帧级权重键
+        如果提供，使用此键作为损失函数中的帧级权重
+    batch_size : int, 默认32
+        每个批次的训练样本数
+    num_workers : int, 可选
+        生成训练样本的工作进程数
+        默认：multiprocessing.cpu_count() // 2
+    pin_memory : bool, 默认False
+        如果为True，数据加载器会将张量复制到CUDA固定内存
+    augmentation : BaseWaveformTransform, 可选
+        torch_audiomentations波形变换，用于训练时的数据增强
+    vad_loss : {"bce", "mse"}, 可选
+        是否添加语音活动检测损失
+        不能与`max_speakers_per_frame`同时使用
+    metric : Metric, Sequence[Metric] 或 Dict[str, Metric], 可选
+        验证指标
+        可以是torchmetrics.MetricCollection支持的任何指标
+        默认：DER（说话人分离错误率）及其组件
+    
+    训练模式
+    --------
+    1. 多标签模式（max_speakers_per_frame=None）：
+       - 每个说话人独立预测（二分类）
+       - 可以处理任意数量的重叠说话人
+       - 使用二元交叉熵损失
+    
+    2. 幂集模式（max_speakers_per_frame≥1）：
+       - 将说话人组合映射为幂集类别
+       - 转换为多分类问题
+       - 使用负对数似然损失
+       - 可以显式建模重叠
+    
+    参考
     ----------
     Hervé Bredin and Antoine Laurent
     "End-To-End Speaker Segmentation for Overlap-Aware Resegmentation."
     Proc. Interspeech 2021
-
+    
     Zhihao Du, Shiliang Zhang, Siqi Zheng, and Zhijie Yan
     "Speaker Embedding-aware Neural Diarization: an Efficient Framework for Overlapping
     Speech Diarization in Meeting Scenarios"
     https://arxiv.org/abs/2203.09767
-
     """
 
     def __init__(

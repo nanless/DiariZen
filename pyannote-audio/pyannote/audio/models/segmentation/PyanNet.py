@@ -36,29 +36,43 @@ from pyannote.audio.utils.params import merge_dict
 
 
 class PyanNet(Model):
-    """PyanNet segmentation model
-
-    SincNet > LSTM > Feed forward > Classifier
-
-    Parameters
+    """PyanNet分割模型
+    
+    一个轻量级的说话人分割模型，架构为：
+    SincNet（特征提取） → LSTM（时序建模） → Feed Forward（全连接层） → Classifier（分类器）
+    
+    特点：
+    - 轻量级：参数量少，推理速度快
+    - 端到端：直接从原始波形学习特征
+    - 时序建模：使用双向LSTM捕获时序依赖
+    
+    参数
     ----------
-    sample_rate : int, optional
-        Audio sample rate. Defaults to 16kHz (16000).
-    num_channels : int, optional
-        Number of channels. Defaults to mono (1).
-    sincnet : dict, optional
-        Keyword arugments passed to the SincNet block.
-        Defaults to {"stride": 1}.
-    lstm : dict, optional
-        Keyword arguments passed to the LSTM layer.
-        Defaults to {"hidden_size": 128, "num_layers": 2, "bidirectional": True},
-        i.e. two bidirectional layers with 128 units each.
-        Set "monolithic" to False to split monolithic multi-layer LSTM into multiple mono-layer LSTMs.
-        This may proove useful for probing LSTM internals.
-    linear : dict, optional
-        Keyword arugments used to initialize linear layers
-        Defaults to {"hidden_size": 128, "num_layers": 2},
-        i.e. two linear layers with 128 units each.
+    sample_rate : int, 默认16000
+        音频采样率（Hz），默认16kHz
+    num_channels : int, 默认1
+        音频通道数，默认单声道
+    sincnet : dict, 可选
+        传递给SincNet块的参数字典
+        默认：{"stride": 10}
+        SincNet是可学习的Sinc卷积层，直接从原始波形提取特征
+    lstm : dict, 可选
+        传递给LSTM层的参数字典
+        默认：{"hidden_size": 128, "num_layers": 2, "bidirectional": True}
+        即：2层双向LSTM，每层128个单元
+        设置"monolithic": False可以将多层LSTM拆分为多个单层LSTM
+        这对于探测LSTM内部状态很有用
+    linear : dict, 可选
+        用于初始化全连接层的参数字典
+        默认：{"hidden_size": 128, "num_layers": 2}
+        即：2个全连接层，每层128个单元
+    
+    架构说明
+    --------
+    1. SincNet: 从原始波形提取60维特征（可学习的频域滤波器）
+    2. LSTM: 双向LSTM处理时序信息（默认2层，每层128单元）
+    3. Linear: 全连接层进一步特征变换（默认2层，每层128单元）
+    4. Classifier: 最终分类层（输出类别数或幂集类别数）
     """
 
     SINCNET_DEFAULTS = {"stride": 10}
@@ -140,13 +154,30 @@ class PyanNet(Model):
 
     @property
     def dimension(self) -> int:
-        """Dimension of output"""
+        """输出维度
+        
+        根据任务规格返回输出维度：
+        - 如果使用幂集编码：返回幂集类别数
+        - 否则：返回常规类别数
+        
+        返回
+        -------
+        int
+            输出维度（类别数）
+        
+        异常
+        ------
+        ValueError
+            如果任务规格是元组（多任务），PyanNet不支持多任务
+        """
         if isinstance(self.specifications, tuple):
             raise ValueError("PyanNet does not support multi-tasking.")
 
         if self.specifications.powerset:
+            # 使用幂集编码：返回幂集类别数
             return self.specifications.num_powerset_classes
         else:
+            # 常规分类：返回类别数
             return len(self.specifications.classes)
 
     def build(self):

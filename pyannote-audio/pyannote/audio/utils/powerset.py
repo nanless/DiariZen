@@ -35,14 +35,38 @@ import torch.nn.functional as F
 
 
 class Powerset(nn.Module):
-    """Powerset to multilabel conversion, and back.
-
-    Parameters
+    """幂集编码/解码模块
+    
+    实现幂集（powerset）编码和多标签之间的转换。
+    幂集编码是一种将多标签分类问题转换为单标签分类问题的方法。
+    
+    原理：
+    - 将多个类别的组合（子集）映射为单个"幂集类别"
+    - 例如：3个类别，最大集合大小为2
+      - 空集 {} → 类别0
+      - {0} → 类别1
+      - {1} → 类别2
+      - {2} → 类别3
+      - {0,1} → 类别4
+      - {0,2} → 类别5
+      - {1,2} → 类别6
+    
+    优势：
+    - 可以处理重叠标签（多个说话人同时说话）
+    - 将多标签问题转换为单标签问题，简化训练
+    
+    参数
     ----------
     num_classes : int
-        Number of regular classes.
+        常规类别数量（例如：说话人数量）
     max_set_size : int
-        Maximum number of classes in each set.
+        每个集合中的最大类别数（例如：最大同时说话人数）
+    
+    使用场景
+    --------
+    主要用于说话人分离任务，处理重叠语音：
+    - 训练时：将多标签（哪些说话人活跃）转换为幂集类别
+    - 推理时：将幂集类别转换回多标签
     """
 
     def __init__(self, num_classes: int, max_set_size: int):
@@ -55,9 +79,27 @@ class Powerset(nn.Module):
 
     @cached_property
     def num_powerset_classes(self) -> int:
-        # compute number of subsets of size at most "max_set_size"
-        # e.g. with num_classes = 3 and max_set_size = 2:
-        # {}, {0}, {1}, {2}, {0, 1}, {0, 2}, {1, 2}
+        """计算幂集类别数量
+        
+        计算大小不超过max_set_size的所有子集的数量。
+        使用组合数学：C(n,0) + C(n,1) + ... + C(n,k)
+        其中n=num_classes，k=max_set_size
+        
+        示例
+        -----
+        当num_classes=3，max_set_size=2时：
+        - C(3,0) = 1: {}
+        - C(3,1) = 3: {0}, {1}, {2}
+        - C(3,2) = 3: {0,1}, {0,2}, {1,2}
+        总计：1 + 3 + 3 = 7个幂集类别
+        
+        返回
+        -------
+        int
+            幂集类别总数
+        """
+        # 计算所有大小不超过max_set_size的子集数量
+        # 使用二项式系数：C(num_classes, i) for i in [0, max_set_size]
         return int(
             sum(
                 scipy.special.binom(self.num_classes, i)
@@ -66,26 +108,33 @@ class Powerset(nn.Module):
         )
 
     def build_mapping(self) -> torch.Tensor:
-        """Compute powerset to regular mapping
-
-        Returns
+        """构建幂集到常规类别的映射矩阵
+        
+        创建一个映射矩阵，将幂集类别转换为多标签表示。
+        矩阵的每一行对应一个幂集类别，每一列对应一个常规类别。
+        
+        返回
         -------
-        mapping : (num_powerset_classes, num_classes) torch.Tensor
-            mapping[i, j] == 1 if jth regular class is a member of ith powerset class
-            mapping[i, j] == 0 otherwise
-
-        Example
+        torch.Tensor
+            映射矩阵，形状为(num_powerset_classes, num_classes)
+            mapping[i, j] == 1: 第j个常规类别是第i个幂集类别的成员
+            mapping[i, j] == 0: 第j个常规类别不是第i个幂集类别的成员
+        
+        示例
         -------
-        With num_classes == 3 and max_set_size == 2, returns
-
-            [0, 0, 0]  # none
-            [1, 0, 0]  # class #1
-            [0, 1, 0]  # class #2
-            [0, 0, 1]  # class #3
-            [1, 1, 0]  # classes #1 and #2
-            [1, 0, 1]  # classes #1 and #3
-            [0, 1, 1]  # classes #2 and #3
-
+        当num_classes=3，max_set_size=2时，返回：
+        
+            [0, 0, 0]  # 空集 {}
+            [1, 0, 0]  # {0}
+            [0, 1, 0]  # {1}
+            [0, 0, 1]  # {2}
+            [1, 1, 0]  # {0, 1}
+            [1, 0, 1]  # {0, 2}
+            [0, 1, 1]  # {1, 2}
+        
+        用途
+        -----
+        用于将模型输出的幂集类别（单标签）转换回多标签表示
         """
         mapping = torch.zeros(self.num_powerset_classes, self.num_classes)
         powerset_k = 0

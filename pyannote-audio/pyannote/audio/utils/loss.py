@@ -21,7 +21,14 @@
 # SOFTWARE.
 
 
-"""Frame-weighted versions of common loss functions"""
+"""帧加权版本的常用损失函数
+
+本模块提供了支持帧级加权的损失函数。
+帧加权允许对不同时间帧分配不同的权重，常用于：
+- 忽略预热区域（warm-up regions）
+- 处理不平衡数据
+- 关注重要时间段
+"""
 
 from typing import Optional
 
@@ -30,19 +37,30 @@ import torch.nn.functional as F
 
 
 def interpolate(target: torch.Tensor, weight: Optional[torch.Tensor] = None):
-    """Interpolate weight to match target frame resolution
-
-    Parameters
+    """插值权重以匹配目标帧分辨率
+    
+    当权重和目标的时间分辨率不同时，使用线性插值将权重调整到目标分辨率。
+    这在处理不同采样率的特征时很有用。
+    
+    参数
     ----------
     target : torch.Tensor
-        Target with shape (batch_size, num_frames) or (batch_size, num_frames, num_classes)
-    weight : torch.Tensor, optional
-        Frame weight with shape (batch_size, num_frames_weight, 1).
-
-    Returns
+        目标张量，形状为：
+        - (batch_size, num_frames)：二分类或多分类
+        - (batch_size, num_frames, num_classes)：多标签分类
+    weight : torch.Tensor, 可选
+        帧权重，形状为(batch_size, num_frames_weight, 1)
+        如果为None，返回None
+    
+    返回
     -------
-    weight : torch.Tensor
-        Interpolated frame weight with shape (batch_size, num_frames, 1).
+    weight : torch.Tensor 或 None
+        插值后的帧权重，形状为(batch_size, num_frames, 1)
+        如果输入weight为None，返回None
+    
+    注意
+    -----
+    使用线性插值（linear interpolation）进行时间维度上的插值
     """
 
     num_frames = target.shape[1]
@@ -61,21 +79,38 @@ def binary_cross_entropy(
     target: torch.Tensor,
     weight: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
-    """Frame-weighted binary cross entropy
-
-    Parameters
+    """帧加权的二元交叉熵损失
+    
+    支持帧级加权的二元交叉熵损失函数。
+    用于二分类和多标签分类任务。
+    
+    参数
     ----------
     prediction : torch.Tensor
-        Prediction with shape (batch_size, num_frames, num_classes).
+        模型预测，形状为(batch_size, num_frames, num_classes)
+        通常是经过sigmoid激活的概率值（0-1之间）
     target : torch.Tensor
-        Target with shape (batch_size, num_frames) for binary or multi-class classification,
-        or (batch_size, num_frames, num_classes) for multi-label classification.
-    weight : (batch_size, num_frames, 1) torch.Tensor, optional
-        Frame weight with shape (batch_size, num_frames, 1).
-
-    Returns
+        目标标签，形状为：
+        - (batch_size, num_frames)：二分类或多分类（会自动扩展维度）
+        - (batch_size, num_frames, num_classes)：多标签分类
+    weight : torch.Tensor, 可选
+        帧权重，形状为(batch_size, num_frames, 1)
+        用于对不同时间帧分配不同权重
+        如果为None，所有帧权重相等
+    
+    返回
     -------
     loss : torch.Tensor
+        标量损失值
+    
+    使用场景
+    --------
+    - 二分类：语音活动检测（VAD）
+    - 多标签分类：说话人分离（多个说话人可能同时活跃）
+    
+    注意
+    -----
+    如果提供了weight，会自动插值以匹配target的时间分辨率
     """
 
     # reshape target to (batch_size, num_frames, num_classes) even if num_classes is 1

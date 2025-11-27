@@ -39,40 +39,69 @@ class SupervisedRepresentationLearningWithArcFace(
     SupervisedRepresentationLearningTaskMixin,
     Task,
 ):
-    """Supervised representation learning with ArcFace loss
-
-    Representation learning is the task of ...
-
-    Parameters
+    """使用ArcFace损失的有监督表示学习任务
+    
+    使用ArcFace损失函数训练说话人嵌入模型。
+    ArcFace是一种角度边距损失函数，通过在角度空间中添加边距来增强类间分离。
+    
+    任务定义
+    --------
+    表示学习是从音频中学习有意义的嵌入向量的任务。
+    这些嵌入向量可以用于说话人识别、验证和聚类等任务。
+    
+    参数
     ----------
     protocol : Protocol
-        pyannote.database protocol
-    duration : float, optional
-        Chunks duration in seconds. Defaults to two seconds (2.).
-    min_duration : float, optional
-        Sample training chunks duration uniformely between `min_duration`
-        and `duration`. Defaults to `duration` (i.e. fixed length chunks).
-    num_classes_per_batch : int, optional
-        Number of classes per batch. Defaults to 32.
-    num_chunks_per_class : int, optional
-        Number of chunks per class. Defaults to 1.
-    margin : float, optional
-        Margin. Defaults to 28.6.
-    scale : float, optional
-        Scale. Defaults to 64.
-    num_workers : int, optional
-        Number of workers used for generating training samples.
-        Defaults to multiprocessing.cpu_count() // 2.
-    pin_memory : bool, optional
-        If True, data loaders will copy tensors into CUDA pinned
-        memory before returning them. See pytorch documentation
-        for more details. Defaults to False.
-    augmentation : BaseWaveformTransform, optional
-        torch_audiomentations waveform transform, used by dataloader
-        during training.
-    metric : optional
-        Validation metric(s). Can be anything supported by torchmetrics.MetricCollection.
-        Defaults to AUROC (area under the ROC curve).
+        pyannote.database协议
+    duration : float, 默认2.0
+        训练块（chunk）的持续时间（秒）
+    min_duration : float, 可选
+        训练块的最小持续时间（秒）
+        如果设置，训练块持续时间将在`min_duration`和`duration`之间均匀采样
+        默认为`duration`（即固定长度块）
+    num_classes_per_batch : int, 默认32
+        每个批次中的类别数
+        用于确保每个批次包含多个说话人的样本
+    num_chunks_per_class : int, 默认1
+        每个类别的块数
+        用于控制每个说话人在批次中的样本数
+    margin : float, 默认28.6
+        ArcFace损失的角度边距（度）
+        较大的边距会增加类间分离，但可能导致训练不稳定
+    scale : float, 默认64.0
+        ArcFace损失的缩放因子
+        用于控制损失函数的梯度大小
+    num_workers : int, 可选
+        用于生成训练样本的工作进程数
+        默认为 multiprocessing.cpu_count() // 2
+    pin_memory : bool, 默认False
+        如果为True，数据加载器将在返回张量之前将它们复制到CUDA固定内存
+        详见PyTorch文档
+    augmentation : BaseWaveformTransform, 可选
+        torch_audiomentations波形变换，训练时由数据加载器使用
+    metric : Metric, Sequence[Metric], 或 Dict[str, Metric], 可选
+        验证指标。可以是torchmetrics.MetricCollection支持的任何指标
+        默认为AUROC（ROC曲线下面积）
+    
+    ArcFace损失
+    -----------
+    ArcFace通过在角度空间中添加边距来增强类间分离：
+    - 将嵌入向量归一化到单位球面
+    - 计算嵌入向量与类别权重之间的角度
+    - 在角度上添加边距（margin）
+    - 使用缩放因子（scale）控制梯度
+    
+    优势
+    -----
+    - 更强的类间分离能力
+    - 更好的泛化性能
+    - 适用于大规模说话人识别任务
+    
+    参考
+    -----
+    Deng, J., et al. (2019).
+    "ArcFace: Additive Angular Margin Loss for Deep Face Recognition."
+    CVPR 2019.
     """
 
     #  TODO: add a ".metric" property that tells how speaker embedding trained with this approach

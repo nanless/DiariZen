@@ -29,6 +29,12 @@ class DiariZenPipeline(SpeakerDiarizationPipeline):
         embedding_model,
         config_parse: Optional[Dict[str, Any]] = None,
         rttm_out_dir: Optional[str] = None,
+        device: Optional[torch.device] = None,
+        segmentation_only: bool = False,
+        binarize_onset: float = 0.5,
+        binarize_offset: Optional[float] = None,
+        binarize_min_duration_on: float = 0.0,
+        binarize_min_duration_off: float = 0.0,
     ):
         config_path = Path(diarizen_hub / "config.toml")
         config = toml.load(config_path.as_posix())
@@ -43,18 +49,70 @@ class DiariZenPipeline(SpeakerDiarizationPipeline):
         
         print(f'Loaded configuration: {config}')
 
+        # 如果没有指定设备，使用默认逻辑
+        if device is None:
+            # 检查 CUDA 是否可用（考虑 CUDA_VISIBLE_DEVICES 环境变量）
+            cuda_available = torch.cuda.is_available() and torch.cuda.device_count() > 0
+            device = torch.device("cuda:0") if cuda_available else torch.device("cpu")
+
+        # DiariZen 模型需要使用 config 来加载，因为检查点格式与标准 pyannote.audio 格式不同
+        # 创建一个包含模型路径和配置的字典，传递给 get_model
+        segmentation_model_path = str(Path(diarizen_hub / "pytorch_model.bin"))
+        segmentation_model_dict = {
+            "checkpoint": segmentation_model_path,
+            "config": config
+        }
+        
         super().__init__(
-            config=config,
-            seg_duration=inference_config["seg_duration"],
-            segmentation=str(Path(diarizen_hub / "pytorch_model.bin")),
+            segmentation=segmentation_model_dict,
             segmentation_step=inference_config["segmentation_step"],
             embedding=embedding_model,
             embedding_exclude_overlap=True,
             clustering=clustering_config["method"],     
             embedding_batch_size=inference_config["batch_size"],
             segmentation_batch_size=inference_config["batch_size"],
-            device=torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
         )
+        
+        # 在初始化后设置设备
+        self.device = device
+        
+        # 递归移动所有子模块到指定设备的辅助函数
+        def move_to_device_recursive(module):
+            """递归地将模块及其所有子模块移动到指定设备"""
+            module.to(device)
+            for child in module.children():
+                move_to_device_recursive(child)
+        
+        # 强制将所有模型组件移动到指定设备
+        if hasattr(self, '_segmentation'):
+            if hasattr(self._segmentation, 'model'):
+                # 递归移动模型及其所有子模块（包括 wavlm_model 等）
+                move_to_device_recursive(self._segmentation.model)
+                # 确保模型在 eval 模式
+                self._segmentation.model.eval()
+            # 移动 conversion 对象（Powerset 转换器）到正确设备
+            if hasattr(self._segmentation, 'conversion'):
+                self._segmentation.conversion = self._segmentation.conversion.to(device)
+            # 确保 Inference 对象也使用正确的设备
+            if hasattr(self._segmentation, 'device'):
+                self._segmentation.device = device
+            # 如果 Inference 对象有 _device 属性，也设置它
+            if hasattr(self._segmentation, '_device'):
+                self._segmentation._device = device
+                
+        if hasattr(self, '_embedding'):
+            # PretrainedSpeakerEmbedding 使用 model_ 属性存储模型
+            if hasattr(self._embedding, 'model_'):
+                move_to_device_recursive(self._embedding.model_)
+                self._embedding.model_.eval()
+            # 也检查是否有 model 属性（向后兼容）
+            if hasattr(self._embedding, 'model'):
+                move_to_device_recursive(self._embedding.model)
+                self._embedding.model.eval()
+            if hasattr(self._embedding, 'device'):
+                self._embedding.device = device
+            if hasattr(self._embedding, '_device'):
+                self._embedding._device = device
 
         self.apply_median_filtering = inference_config["apply_median_filtering"]
         self.min_speakers = clustering_config["min_speakers"]
@@ -88,6 +146,13 @@ class DiariZenPipeline(SpeakerDiarizationPipeline):
         if rttm_out_dir is not None:
             os.makedirs(rttm_out_dir, exist_ok=True)
         self.rttm_out_dir = rttm_out_dir
+        self.segmentation_only = segmentation_only  # 是否只使用 segmentation，跳过 embedding 和 clustering
+        
+        # Binarize参数（用于将segmentation转换为最终diarization）
+        self.binarize_onset = binarize_onset
+        self.binarize_offset = binarize_offset if binarize_offset is not None else binarize_onset
+        self.binarize_min_duration_on = binarize_min_duration_on
+        self.binarize_min_duration_off = binarize_min_duration_off
 
         assert self._segmentation.model.specifications.powerset is True
 
@@ -97,24 +162,39 @@ class DiariZenPipeline(SpeakerDiarizationPipeline):
         repo_id: str, 
         cache_dir: str = None,
         rttm_out_dir: str = None,
+        device: Optional[torch.device] = None,
+        segmentation_only: bool = False,
+        binarize_onset: float = 0.5,
+        binarize_offset: Optional[float] = None,
+        binarize_min_duration_on: float = 0.0,
+        binarize_min_duration_off: float = 0.0,
     ) -> "DiariZenPipeline":
-        diarizen_hub = snapshot_download(
-            repo_id=repo_id,
-            cache_dir=cache_dir,
-            local_files_only=cache_dir is not None
-        )
+        # 检查是否是本地路径
+        local_path = Path(repo_id)
+        if local_path.exists() and local_path.is_dir():
+            diarizen_hub = local_path
+        else:
+            diarizen_hub = snapshot_download(
+                repo_id=repo_id,
+                cache_dir=cache_dir
+            )
 
         embedding_model = hf_hub_download(
             repo_id="pyannote/wespeaker-voxceleb-resnet34-LM",
             filename="pytorch_model.bin",
-            cache_dir=cache_dir,
-            local_files_only=cache_dir is not None
+            cache_dir=cache_dir
         )
 
         return cls(
             diarizen_hub=Path(diarizen_hub).expanduser().absolute(),
             embedding_model=embedding_model,
-            rttm_out_dir=rttm_out_dir
+            rttm_out_dir=rttm_out_dir,
+            device=device,
+            segmentation_only=segmentation_only,
+            binarize_onset=binarize_onset,
+            binarize_offset=binarize_offset,
+            binarize_min_duration_on=binarize_min_duration_on,
+            binarize_min_duration_off=binarize_min_duration_off,
         )
 
     def __call__(self, in_wav, sess_name=None):
@@ -124,7 +204,13 @@ class DiariZenPipeline(SpeakerDiarizationPipeline):
         print('Extracting segmentations.')
         waveform, sample_rate = torchaudio.load(in_wav) 
         waveform = torch.unsqueeze(waveform[0], 0)      # force to use the SDM data
-        segmentations = self.get_segmentations({"waveform": waveform, "sample_rate": sample_rate}, soft=False)
+        # 确保输入数据在正确的设备上
+        waveform = waveform.to(self.device)
+        
+        # CPU 优化：使用 torch.inference_mode() 来加速推理（禁用梯度计算和自动微分）
+        # inference_mode 比 no_grad 更快，因为它完全禁用了自动微分图构建
+        with torch.inference_mode():
+            segmentations = self.get_segmentations({"waveform": waveform, "sample_rate": sample_rate}, soft=False)
 
         if self.apply_median_filtering:
             segmentations.data = median_filter(segmentations.data, size=(1, 11, 1), mode='reflect')
@@ -139,45 +225,77 @@ class DiariZenPipeline(SpeakerDiarizationPipeline):
             warm_up=(0.0, 0.0),
         )
 
-        print("Extracting Embeddings.")
-        embeddings = self.get_embeddings(
-            {"waveform": waveform, "sample_rate": sample_rate},
-            binarized_segmentations,
-            exclude_overlap=self.embedding_exclude_overlap,
-        )
+        if self.segmentation_only:
+            # 只使用 segmentation，跳过 embedding 和 clustering
+            # 将 powerset segmentation 转换为 multi-label
+            print("Converting powerset to multilabel (segmentation-only mode).")
+            
+            # 获取 conversion 对象（Powerset 转换器）
+            conversion = self._segmentation.conversion
+            
+            # 将 powerset segmentation 转换为 multi-label
+            # segmentations.data 形状: (num_chunks, num_frames, num_powerset_classes)
+            num_chunks, num_frames, num_powerset_classes = segmentations.data.shape
+            
+            # 转换为 torch tensor 并移动到正确设备
+            powerset_tensor = torch.from_numpy(segmentations.data).to(self.device)
+            
+            # 转换为 multi-label: (num_chunks, num_frames, num_speakers)
+            multilabel_tensor = conversion.to_multilabel(powerset_tensor, soft=False)
+            multilabel_data = multilabel_tensor.cpu().numpy()
+            
+            # 创建 multi-label segmentation
+            from pyannote.core import SlidingWindowFeature
+            multilabel_segmentations = SlidingWindowFeature(
+                multilabel_data, 
+                segmentations.sliding_window
+            )
+            
+            # 直接从 multi-label segmentation 得到 diarization
+            discrete_diarization, _ = self.to_diarization(multilabel_segmentations, count)
+        else:
+            # 使用完整的流程：embedding + clustering
+            print("Extracting Embeddings.")
+            # CPU 优化：在 inference_mode 下提取嵌入
+            with torch.inference_mode():
+                embeddings = self.get_embeddings(
+                    {"waveform": waveform, "sample_rate": sample_rate},
+                    binarized_segmentations,
+                    exclude_overlap=self.embedding_exclude_overlap,
+                )
 
-        # shape: (num_chunks, local_num_speakers, dimension)
-        print("Clustering.")
-        hard_clusters, _, _ = self.clustering(
-            embeddings=embeddings,
-            segmentations=binarized_segmentations,
-            min_clusters=self.min_speakers,  
-            max_clusters=self.max_speakers
-        )
+            # shape: (num_chunks, local_num_speakers, dimension)
+            print("Clustering.")
+            hard_clusters, _, _ = self.clustering(
+                embeddings=embeddings,
+                segmentations=binarized_segmentations,
+                min_clusters=self.min_speakers,  
+                max_clusters=self.max_speakers
+            )
 
-        # during counting, we could possibly overcount the number of instantaneous
-        # speakers due to segmentation errors, so we cap the maximum instantaneous number
-        # of speakers by the `max_speakers` value
-        count.data = np.minimum(count.data, self.max_speakers).astype(np.int8)
+            # during counting, we could possibly overcount the number of instantaneous
+            # speakers due to segmentation errors, so we cap the maximum instantaneous number
+            # of speakers by the `max_speakers` value
+            count.data = np.minimum(count.data, self.max_speakers).astype(np.int8)
 
-        # keep track of inactive speakers
-        inactive_speakers = np.sum(binarized_segmentations.data, axis=1) == 0
-        #   shape: (num_chunks, num_speakers)
+            # keep track of inactive speakers
+            inactive_speakers = np.sum(binarized_segmentations.data, axis=1) == 0
+            #   shape: (num_chunks, num_speakers)
 
-        # reconstruct discrete diarization from raw hard clusters
-        hard_clusters[inactive_speakers] = -2
-        discrete_diarization, _ = self.reconstruct(
-            segmentations,
-            hard_clusters,
-            count,
-        )
+            # reconstruct discrete diarization from raw hard clusters
+            hard_clusters[inactive_speakers] = -2
+            discrete_diarization, _ = self.reconstruct(
+                segmentations,
+                hard_clusters,
+                count,
+            )
 
         # convert to annotation
         to_annotation = Binarize(
-            onset=0.5,
-            offset=0.5,
-            min_duration_on=0.0,
-            min_duration_off=0.0
+            onset=self.binarize_onset,
+            offset=self.binarize_offset,
+            min_duration_on=self.binarize_min_duration_on,
+            min_duration_off=self.binarize_min_duration_off
         )
         result = to_annotation(discrete_diarization)
         result.uri = sess_name

@@ -186,63 +186,72 @@ def get_dtype(value: int) -> str:
 
 
 class Task(pl.LightningDataModule):
-    """Base task class
-
-    A task is the combination of a "problem" and a "dataset".
-    For example, here are a few tasks:
-    - voice activity detection on the AMI corpus
-    - speaker embedding on the VoxCeleb corpus
-    - end-to-end speaker diarization on the VoxConverse corpus
-
-    A task is expected to be solved by a "model" that takes an
-    audio chunk as input and returns the solution. Hence, the
-    task is in charge of generating (input, expected_output)
-    samples used for training the model.
-
-    Parameters
+    """任务基类：定义机器学习任务和数据集管理
+    
+    任务是"问题"和"数据集"的组合。
+    例如：
+    - 在AMI语料库上进行语音活动检测
+    - 在VoxCeleb语料库上进行说话人嵌入
+    - 在VoxConverse语料库上进行端到端说话人分离
+    
+    任务负责生成用于训练模型的(输入, 期望输出)样本。
+    模型接收音频块作为输入，返回解决方案。
+    
+    参数
     ----------
     protocol : Protocol
-        pyannote.database protocol
-    cache : str, optional
-        As (meta-)data preparation might take a very long time for large datasets,
-        it can be cached to disk for later (and faster!) re-use.
-        When `cache` does not exist, `Task.prepare_data()` generates training
-        and validation metadata from `protocol` and save them to disk.
-        When `cache` exists, `Task.prepare_data()` is skipped and (meta)-data
-        are loaded from disk. Defaults to a temporary path.
-    duration : float, optional
-        Chunks duration in seconds. Defaults to two seconds (2.).
-    min_duration : float, optional
-        Sample training chunks duration uniformely between `min_duration`
-        and `duration`. Defaults to `duration` (i.e. fixed length chunks).
-    warm_up : float or (float, float), optional
-        Use that many seconds on the left- and rightmost parts of each chunk
-        to warm up the model. This is mostly useful for segmentation tasks.
-        While the model does process those left- and right-most parts, only
-        the remaining central part of each chunk is used for computing the
-        loss during training, and for aggregating scores during inference.
-        Defaults to 0. (i.e. no warm-up).
-    batch_size : int, optional
-        Number of training samples per batch. Defaults to 32.
-    num_workers : int, optional
-        Number of workers used for generating training samples.
-        Defaults to multiprocessing.cpu_count() // 2.
-    pin_memory : bool, optional
-        If True, data loaders will copy tensors into CUDA pinned
-        memory before returning them. See pytorch documentation
-        for more details. Defaults to False.
-    augmentation : BaseWaveformTransform, optional
-        torch_audiomentations waveform transform, used by dataloader
-        during training.
-    metric : optional
-        Validation metric(s). Can be anything supported by torchmetrics.MetricCollection.
-        Defaults to value returned by `default_metric` method.
-
-    Attributes
+        pyannote.database协议对象，定义了数据集的结构和访问方式
+    cache : str, 可选
+        数据缓存路径
+        由于大数据集的元数据准备可能耗时很长，可以缓存到磁盘以便后续快速重用。
+        - 当cache不存在时：`Task.prepare_data()`会从protocol生成训练和验证元数据并保存到磁盘
+        - 当cache存在时：`Task.prepare_data()`会被跳过，直接从磁盘加载元数据
+        默认使用临时路径
+    duration : float, 默认2.0
+        音频块持续时间（秒）
+        训练时每个样本的音频长度
+    min_duration : float, 可选
+        最小音频块持续时间（秒）
+        如果指定，训练块持续时间会在`min_duration`和`duration`之间均匀采样
+        默认等于`duration`（即固定长度块）
+    warm_up : float 或 (float, float), 默认0.0
+        预热时间（秒）
+        在每个块的左右两端使用这么多秒来预热模型。
+        主要用于分割任务，帮助模型处理边界效应。
+        模型会处理这些左右两端部分，但只有中间部分用于：
+        - 训练时计算损失
+        - 推理时聚合分数
+        可以是单个值（左右对称）或元组(left, right)
+    batch_size : int, 默认32
+        每个批次的训练样本数
+        较大的批次可以提高训练速度，但需要更多内存
+    num_workers : int, 可选
+        用于生成训练样本的工作进程数
+        默认：multiprocessing.cpu_count() // 2
+        注意：macOS Python 3.8+不支持num_workers > 0
+    pin_memory : bool, 默认False
+        如果为True，数据加载器会将张量复制到CUDA固定内存
+        可以加速GPU数据传输，详见PyTorch文档
+    augmentation : BaseWaveformTransform, 可选
+        torch_audiomentations波形变换
+        用于训练时的数据增强（如添加噪声、时间拉伸等）
+    metric : Metric, Sequence[Metric] 或 Dict[str, Metric], 可选
+        验证指标
+        可以是torchmetrics.MetricCollection支持的任何指标
+        默认使用`default_metric()`方法的返回值
+    
+    属性
     ----------
-    specifications : Specifications or tuple of Specifications
-        Task specifications (available after `Task.setup` has been called.)
-
+    specifications : Specifications 或 tuple of Specifications
+        任务规格（在调用`Task.setup()`后可用）
+        定义了任务类型、类别、分辨率等信息
+    
+    工作流程
+    --------
+    1. prepare_data(): 准备和缓存数据（只在主进程执行一次）
+    2. setup(): 加载缓存数据到每个设备
+    3. train_dataloader(): 创建训练数据加载器
+    4. val_dataloader(): 创建验证数据加载器（如果有验证集）
     """
 
     def __init__(

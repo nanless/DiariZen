@@ -33,7 +33,16 @@ from pyannote.audio.utils.signal import Binarize
 
 # TODO: move to dedicated module
 class SpeakerDiarizationMixin:
-    """Defines a bunch of methods common to speaker diarization pipelines"""
+    """说话人分离管道混入类
+    
+    定义了说话人分离管道共用的方法集合。
+    这些方法被SpeakerDiarization等管道类继承使用。
+    
+    主要功能：
+    - 说话人数验证和设置
+    - 最优说话人映射（对齐参考和假设）
+    - 说话人计数估计
+    """
 
     @staticmethod
     def set_num_speakers(
@@ -41,22 +50,35 @@ class SpeakerDiarizationMixin:
         min_speakers: Optional[int] = None,
         max_speakers: Optional[int] = None,
     ):
-        """Validate number of speakers
-
-        Parameters
+        """验证和设置说话人数
+        
+        处理说话人数的约束条件：
+        - 如果指定了num_speakers，它会覆盖min_speakers和max_speakers
+        - 验证min_speakers ≤ max_speakers
+        - 如果min_speakers == max_speakers，设置num_speakers
+        
+        参数
         ----------
-        num_speakers : int, optional
-            Number of speakers.
-        min_speakers : int, optional
-            Minimum number of speakers.
-        max_speakers : int, optional
-            Maximum number of speakers.
-
-        Returns
+        num_speakers : int, 可选
+            精确的说话人数（如果指定，会覆盖min和max）
+        min_speakers : int, 可选
+            最小说话人数
+        max_speakers : int, 可选
+            最大说话人数
+        
+        返回
         -------
-        num_speakers : int or None
+        num_speakers : int 或 None
+            精确说话人数（如果min==max）或None
         min_speakers : int
-        max_speakers : int or np.inf
+            最小说话人数（至少为1）
+        max_speakers : int 或 np.inf
+            最大说话人数
+        
+        异常
+        ------
+        ValueError
+            如果min_speakers > max_speakers
         """
 
         # override {min|max}_num_speakers by num_speakers when available
@@ -79,25 +101,36 @@ class SpeakerDiarizationMixin:
         hypothesis: Annotation,
         return_mapping: bool = False,
     ) -> Union[Annotation, Tuple[Annotation, Dict[Label, Label]]]:
-        """Find the optimal bijective mapping between reference and hypothesis labels
-
-        Parameters
+        """寻找参考和假设之间的最优双射映射
+        
+        使用DER（说话人分离错误率）指标找到最优的说话人标签映射。
+        这对于评估很重要，因为说话人标签的顺序是任意的。
+        
+        参数
         ----------
-        reference : Annotation or Mapping
-            Reference annotation. Can be an Annotation instance or
-            a mapping with an "annotation" key.
+        reference : Annotation 或 Mapping
+            参考标注
+            可以是Annotation实例，或包含"annotation"键的字典
         hypothesis : Annotation
-            Hypothesized annotation.
-        return_mapping : bool, optional
-            Return the label mapping itself along with the mapped annotation. Defaults to False.
-
-        Returns
+            假设标注（模型预测结果）
+        return_mapping : bool, 默认False
+            是否返回映射字典本身
+        
+        返回
         -------
         mapped : Annotation
-            Hypothesis mapped to reference speakers.
-        mapping : dict, optional
-            Mapping between hypothesis (key) and reference (value) labels
-            Only returned if `return_mapping` is True.
+            映射到参考说话人的假设标注
+        mapping : dict, 可选
+            说话人标签映射字典
+            key：假设中的说话人标签
+            value：参考中对应的说话人标签
+            仅在return_mapping=True时返回
+        
+        用途
+        -----
+        - 评估时对齐预测和参考的说话人标签
+        - 计算准确的DER指标
+        - 可视化时显示对齐后的结果
         """
 
         if isinstance(reference, Mapping):
@@ -117,31 +150,49 @@ class SpeakerDiarizationMixin:
         else:
             return mapped_hypothesis
 
-    # TODO: get rid of warm-up parameter (trimming should be applied before calling speaker_count)
+    # TODO: 移除warm-up参数（应该在调用speaker_count之前应用trimming）
     @staticmethod
     def speaker_count(
         binarized_segmentations: SlidingWindowFeature,
         frames: SlidingWindow,
         warm_up: Tuple[float, float] = (0.1, 0.1),
     ) -> SlidingWindowFeature:
-        """Estimate frame-level number of instantaneous speakers
-
-        Parameters
+        """估计帧级别的瞬时说话人数
+        
+        从二值化分割结果估计每个时间帧的说话人数量。
+        通过统计每个帧中活跃的说话人数来实现。
+        
+        参数
         ----------
         binarized_segmentations : SlidingWindowFeature
-            (num_chunks, num_frames, num_classes)-shaped binarized scores.
-        warm_up : (float, float) tuple, optional
-            Left/right warm up ratio of chunk duration.
-            Defaults to (0.1, 0.1), i.e. 10% on both sides.
+            二值化分割结果，形状为(num_chunks, num_frames, num_classes)
+            每个元素表示该帧是否属于该说话人（0或1）
         frames : SlidingWindow
-            Frames resolution. Defaults to estimate it automatically based on
-            `segmentations` shape and chunk size. Providing the exact frame
-            resolution (when known) leads to better temporal precision.
-
-        Returns
+            帧分辨率（时间窗口信息）
+            如果已知，提供精确的帧分辨率可以获得更好的时间精度
+        warm_up : (float, float), 默认(0.1, 0.1)
+            左右预热比例（相对于块持续时间）
+            默认：左右各10%
+            预热区域会被trim掉，不参与计数
+        
+        返回
         -------
-        count : SlidingWindowFeature
-            (num_frames, 1)-shaped instantaneous speaker count
+        SlidingWindowFeature
+            瞬时说话人数，形状为(num_frames, 1)
+            每个元素表示该帧的说话人数量
+        
+        处理流程
+        --------
+        1. Trim掉预热区域
+        2. 对每个帧，统计活跃说话人数（sum along classes axis）
+        3. 聚合多个块的结果（overlap-add）
+        4. 返回帧级说话人数
+        
+        用途
+        -----
+        - 估计重叠语音区域
+        - 说话人数估计
+        - 后处理优化
         """
 
         trimmed = Inference.trim(binarized_segmentations, warm_up=warm_up)

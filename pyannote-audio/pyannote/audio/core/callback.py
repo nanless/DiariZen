@@ -29,39 +29,47 @@ from pyannote.audio import Model
 
 
 class GraduallyUnfreeze(Callback):
-    """Gradually unfreeze layers
-
-    1. Start training with all layers frozen, but those that depends on the task
-       (i.e. those instantiated in model.build() and task.setup_loss_func()
-    2. Train for a few epochs and unfreeze a few more layers
-    3. Repeat
-
-    Parameters
+    """渐进式解冻回调：逐步解冻模型层
+    
+    这是一种迁移学习策略，用于微调预训练模型：
+    1. 开始时冻结所有层，只训练任务相关层（在model.build()和task.setup_loss_func()中实例化的层）
+    2. 训练几个epoch后，解冻更多层
+    3. 重复此过程，逐步解冻所有层
+    
+    这种方法可以：
+    - 稳定训练过程
+    - 避免破坏预训练特征
+    - 逐步适应新任务
+    
+    参数
     ----------
-    schedule:
-        See examples for supported format.
-    epochs_per_stage : int, optional
-        Number of epochs between each stage. Defaults to 1.
-        Has no effect if schedule is provided as a {layer_name: epoch} dictionary.
-
-    Usage
+    schedule : dict 或 list, 可选
+        解冻计划，支持多种格式（见示例）
+        如果为None，自动从模型架构推断
+    epochs_per_stage : int, 可选
+        每个阶段之间的epoch数，默认1
+        如果schedule是字典格式，此参数无效
+    
+    使用示例
     -----
+    >>> # 创建回调
     >>> callback = GraduallyUnfreeze()
+    >>> # 在训练器中使用
     >>> Trainer(callbacks=[callback]).fit(model)
-
-    Examples
+    
+    示例
     --------
-    # for a model with PyanNet architecture (sincnet > lstm > linear > task_specific),
-    # those are equivalent and will unfreeze 'linear' at epoch 1, 'lstm' at epoch 2,
-    # and 'sincnet' at epoch 3.
-    GraduallyUnfreeze()
-    GraduallyUnfreeze(schedule=['linear', 'lstm', 'sincnet'])
-    GraduallyUnfreeze(schedule={'linear': 1, 'lstm': 2, 'sincnet': 3})
-
-    # the following syntax is also possible (with its dict-based equivalent just below):
-    GraduallyUnfreeze(schedule=['linear', ['lstm', 'sincnet']], epochs_per_stage=10)
-    GraduallyUnfreeze(schedule={'linear': 10, 'lstm': 20, 'sincnet': 20})
-    # will unfreeze 'linear' at epoch 10, and both 'lstm' and 'sincnet' at epoch 20.
+    # 对于PyanNet架构（sincnet > lstm > linear > task_specific），
+    # 以下三种方式等价，会在epoch 1解冻'linear'，epoch 2解冻'lstm'，epoch 3解冻'sincnet'
+    >>> GraduallyUnfreeze()  # 自动推断顺序
+    >>> GraduallyUnfreeze(schedule=['linear', 'lstm', 'sincnet'])  # 列表格式
+    >>> GraduallyUnfreeze(schedule={'linear': 1, 'lstm': 2, 'sincnet': 3})  # 字典格式
+    
+    # 也可以指定多个层在同一epoch解冻：
+    >>> GraduallyUnfreeze(schedule=['linear', ['lstm', 'sincnet']], epochs_per_stage=10)
+    >>> # 等价于：
+    >>> GraduallyUnfreeze(schedule={'linear': 10, 'lstm': 20, 'sincnet': 20})
+    >>> # 会在epoch 10解冻'linear'，epoch 20同时解冻'lstm'和'sincnet'
     """
 
     def __init__(
@@ -69,45 +77,90 @@ class GraduallyUnfreeze(Callback):
         schedule: Union[Mapping[Text, int], List[Union[List[Text], Text]]] = None,
         epochs_per_stage: Optional[int] = None,
     ):
+        """初始化渐进式解冻回调
+        
+        参数
+        ----------
+        schedule : dict 或 list, 可选
+            解冻计划
+            - dict: {layer_name: epoch}，指定每个层在哪个epoch解冻
+            - list: [layer1, layer2, ...] 或 [layer1, [layer2, layer3], ...]，按顺序解冻
+        epochs_per_stage : int, 可选
+            每个阶段之间的epoch数
+            如果schedule是list且未指定，默认为1
+        """
         super().__init__()
 
+        # 如果schedule是None或List且未指定epochs_per_stage，默认为1
         if (
             (schedule is None) or (isinstance(schedule, List))
         ) and epochs_per_stage is None:
             epochs_per_stage = 1
 
-        self.epochs_per_stage = epochs_per_stage
-        self.schedule = schedule
+        self.epochs_per_stage = epochs_per_stage  # 每个阶段的epoch数
+        self.schedule = schedule  # 解冻计划
 
     def on_fit_start(self, trainer: Trainer, model: Model):
-
+        """训练开始时调用：设置初始冻结状态
+        
+        在训练开始前：
+        1. 确定任务相关层和骨干层
+        2. 解析解冻计划
+        3. 冻结所有骨干层（保留任务相关层可训练）
+        
+        参数
+        ----------
+        trainer : Trainer
+            PyTorch Lightning训练器
+        model : Model
+            要训练的模型
+        """
         schedule = self.schedule
 
+        # 获取任务相关层（这些层始终可训练）
         task_specific_layers = model.task_dependent
+        # 获取所有骨干层（从后往前，从输出层到输入层）
         backbone_layers = [
             layer
             for layer, _ in reversed(ModelSummary(model, max_depth=1).named_modules)
             if layer not in task_specific_layers
         ]
 
+        # 如果未指定schedule，使用所有骨干层（按顺序）
         if schedule is None:
             schedule = backbone_layers
 
+        # 如果schedule是列表，转换为字典格式
         if isinstance(schedule, List):
             _schedule = dict()
             for depth, layers in enumerate(schedule):
+                # 支持单个层或层列表
                 layers = layers if isinstance(layers, List) else [layers]
                 for layer in layers:
+                    # 计算解冻epoch：(深度+1) × 每阶段epoch数
                     _schedule[layer] = (depth + 1) * self.epochs_per_stage
             schedule = _schedule
 
         self.schedule = schedule
 
-        # freeze all but task specific layers
+        # 冻结所有骨干层（任务相关层保持可训练）
         for layer in backbone_layers:
             model.freeze_by_name(layer)
 
     def on_train_epoch_start(self, trainer: Trainer, model: Model):
+        """每个训练epoch开始时调用：检查是否需要解冻层
+        
+        根据解冻计划，在当前epoch解冻相应的层。
+        
+        参数
+        ----------
+        trainer : Trainer
+            PyTorch Lightning训练器
+        model : Model
+            要训练的模型
+        """
+        # 遍历解冻计划，检查是否有层需要在当前epoch解冻
         for layer, epoch in self.schedule.items():
             if epoch == trainer.current_epoch:
+                # 解冻该层
                 model.unfreeze_by_name(layer)

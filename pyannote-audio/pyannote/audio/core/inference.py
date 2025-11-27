@@ -41,43 +41,63 @@ from pyannote.audio.utils.reproducibility import fix_reproducibility
 
 
 class BaseInference:
+    """推理基类（占位符）
+    
+    目前未使用，保留用于未来扩展。
+    """
     pass
 
 
 class Inference(BaseInference):
-    """Inference
-
-    Parameters
+    """模型推理引擎
+    
+    统一的模型推理接口，处理：
+    - 滑动窗口推理（sliding window）
+    - 整段推理（whole file）
+    - 结果聚合（overlap-add）
+    - 批处理优化
+    - 设备管理
+    
+    参数
     ----------
-    model : Model
-        Model. Will be automatically set to eval() mode and moved to `device` when provided.
-    window : {"sliding", "whole"}, optional
-        Use a "sliding" window and aggregate the corresponding outputs (default)
-        or just one (potentially long) window covering the "whole" file or chunk.
-    duration : float, optional
-        Chunk duration, in seconds. Defaults to duration used for training the model.
-        Has no effect when `window` is "whole".
-    step : float, optional
-        Step between consecutive chunks, in seconds. Defaults to warm-up duration when
-        greater than 0s, otherwise 10% of duration. Has no effect when `window` is "whole".
-    pre_aggregation_hook : callable, optional
-        When a callable is provided, it is applied to the model output, just before aggregation.
-        Takes a (num_chunks, num_frames, dimension) numpy array as input and returns a modified
-        (num_chunks, num_frames, other_dimension) numpy array passed to overlap-add aggregation.
-    skip_aggregation : bool, optional
-        Do not aggregate outputs when using "sliding" window. Defaults to False.
-    skip_conversion: bool, optional
-        In case a task has been trained with `powerset` mode, output is automatically
-        converted to `multi-label`, unless `skip_conversion` is set to True.
-    batch_size : int, optional
-        Batch size. Larger values (should) make inference faster. Defaults to 32.
-    device : torch.device, optional
-        Device used for inference. Defaults to `model.device`.
-        In case `device` and `model.device` are different, model is sent to device.
-    use_auth_token : str, optional
-        When loading a private huggingface.co model, set `use_auth_token`
-        to True or to a string containing your hugginface.co authentication
-        token that can be obtained by running `huggingface-cli login`
+    model : Model, str 或 Path
+        模型实例、模型路径或HuggingFace模型ID
+        如果提供路径或ID，会自动加载模型
+        模型会自动设置为eval()模式并移动到指定设备
+    window : {"sliding", "whole"}, 默认"sliding"
+        推理窗口模式：
+        - "sliding": 使用滑动窗口并聚合输出（推荐，适用于帧级模型）
+        - "whole": 使用单个窗口覆盖整个文件（适用于块级模型）
+    duration : float, 可选
+        音频块持续时间（秒）
+        默认使用模型训练时的duration
+        当window="whole"时无效
+    step : float, 可选
+        连续块之间的步长（秒）
+        默认：如果warm_up>0则使用warm_up，否则使用duration的10%
+        当window="whole"时无效
+    pre_aggregation_hook : callable, 可选
+        聚合前的钩子函数
+        在聚合之前对模型输出进行处理
+        输入：(num_chunks, num_frames, dimension) numpy数组
+        输出：(num_chunks, num_frames, other_dimension) numpy数组
+    skip_aggregation : bool, 默认False
+        是否跳过聚合（当window="sliding"时）
+        如果为True，直接返回未聚合的输出
+    skip_conversion : bool, 默认False
+        是否跳过幂集到多标签的转换
+        如果模型使用powerset模式训练，默认会自动转换为multi-label
+        设置True可跳过转换
+    batch_size : int, 默认32
+        批处理大小
+        较大的值通常可以提高推理速度（如果内存允许）
+    device : torch.device, 可选
+        推理设备（CPU或GPU）
+        默认使用model.device
+        如果指定了不同的设备，模型会被移动到该设备
+    use_auth_token : str, 可选
+        当加载私有HuggingFace模型时，设置认证token
+        可以通过运行`huggingface-cli login`获取
     """
 
     def __init__(
@@ -93,8 +113,10 @@ class Inference(BaseInference):
         batch_size: int = 32,
         use_auth_token: Union[Text, None] = None,
     ):
-        # ~~~~ model ~~~~~
-
+        """初始化推理引擎"""
+        
+        # ========== 模型加载 ==========
+        # 如果提供的是路径或ID，自动加载模型；否则直接使用提供的模型实例
         self.model = (
             model
             if isinstance(model, Model)

@@ -40,31 +40,53 @@ from pyannote.audio.utils.receptive_field import (
 
 
 class SSeRiouSS(Model):
-    """Self-Supervised Representation for Speaker Segmentation
-
-    wav2vec > LSTM > Feed forward > Classifier
-
-    Parameters
+    """SSeRiouSS分割模型：基于自监督表示的高精度分割模型
+    
+    架构：wav2vec（自监督特征） → LSTM（时序建模） → Feed Forward（全连接层） → Classifier（分类器）
+    
+    特点：
+    - 高精度：使用大规模预训练的自监督表示（如WAVLM）
+    - 多尺度特征：可以融合多个wav2vec层的特征
+    - 时序建模：使用深层双向LSTM捕获长时依赖
+    
+    参数
     ----------
-    sample_rate : int, optional
-        Audio sample rate. Defaults to 16kHz (16000).
-    num_channels : int, optional
-        Number of channels. Defaults to mono (1).
-    wav2vec: dict or str, optional
-        Defaults to "WAVLM_BASE".
-    wav2vec_layer: int, optional
-        Index of layer to use as input to the LSTM.
-        Defaults (-1) to use average of all layers (with learnable weights).
-    lstm : dict, optional
-        Keyword arguments passed to the LSTM layer.
-        Defaults to {"hidden_size": 128, "num_layers": 4, "bidirectional": True},
-        i.e. two bidirectional layers with 128 units each.
-        Set "monolithic" to False to split monolithic multi-layer LSTM into multiple mono-layer LSTMs.
-        This may proove useful for probing LSTM internals.
-    linear : dict, optional
-        Keyword arugments used to initialize linear layers
-        Defaults to {"hidden_size": 128, "num_layers": 2},
-        i.e. two linear layers with 128 units each.
+    sample_rate : int, 默认16000
+        音频采样率（Hz），默认16kHz
+    num_channels : int, 默认1
+        音频通道数，默认单声道
+    wav2vec : dict 或 str, 默认"WAVLM_BASE"
+        自监督表示模型配置
+        - str: torchaudio预训练模型名称（如"WAVLM_BASE"）
+        - dict: wav2vec2_model配置字典
+        - str（路径）: 自监督表示检查点路径
+    wav2vec_layer : int, 默认-1
+        使用的wav2vec层索引
+        -1：使用所有层的加权平均（可学习权重）
+        ≥0：使用指定层的输出
+    lstm : dict, 可选
+        传递给LSTM层的参数字典
+        默认：{"hidden_size": 128, "num_layers": 4, "bidirectional": True}
+        即：4层双向LSTM，每层128个单元
+        设置"monolithic": False可以将多层LSTM拆分为多个单层LSTM
+        这对于探测LSTM内部状态很有用
+    linear : dict, 可选
+        用于初始化全连接层的参数字典
+        默认：{"hidden_size": 128, "num_layers": 2}
+        即：2个全连接层，每层128个单元
+    
+    架构说明
+    --------
+    1. wav2vec/WAVLM: 从原始波形提取自监督特征（768维@WAVLM_BASE）
+    2. LSTM: 深层双向LSTM处理时序信息（默认4层，每层128单元）
+    3. Linear: 全连接层进一步特征变换（默认2层，每层128单元）
+    4. Classifier: 最终分类层（输出类别数或幂集类别数）
+    
+    优势
+    -----
+    - 利用大规模预训练的自监督表示，性能优于PyanNet
+    - 可以处理更复杂的声学环境
+    - 支持多说话人重叠场景
     """
 
     WAV2VEC_DEFAULTS = "WAVLM_BASE"

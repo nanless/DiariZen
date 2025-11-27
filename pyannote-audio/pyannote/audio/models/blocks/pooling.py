@@ -30,34 +30,61 @@ from einops import rearrange
 
 
 class StatsPool(nn.Module):
-    """Statistics pooling
-
-    Compute temporal mean and (unbiased) standard deviation
-    and returns their concatenation.
-
-    Reference
+    """统计池化层
+    
+    计算时序特征的加权均值和（无偏）标准差，并返回它们的拼接。
+    这是说话人嵌入模型中常用的池化方法，将变长序列转换为固定长度向量。
+    
+    输出 = [均值, 标准差]
+    维度：输入features → 输出2*features
+    
+    参考
     ---------
     https://en.wikipedia.org/wiki/Weighted_arithmetic_mean
-
+    
+    使用场景
+    --------
+    主要用于说话人嵌入模型（如X-Vector），将变长语音特征序列
+    池化为固定长度的说话人表征向量。
+    
+    特点
+    -----
+    - 支持加权统计（可以只考虑活跃区域）
+    - 无偏标准差估计
+    - 可以处理多说话人情况（为每个说话人单独计算）
     """
 
     def _pool(self, sequences: torch.Tensor, weights: torch.Tensor) -> torch.Tensor:
-        """Helper function to compute statistics pooling
-
-        Assumes that weights are already interpolated to match the number of frames
-        in sequences and that they encode the activation of only one speaker.
-
-        Parameters
+        """辅助函数：计算统计池化
+        
+        计算加权均值和标准差的核心实现。
+        假设权重已经插值到与sequences相同的帧数，且只编码单个说话人的激活。
+        
+        参数
         ----------
-        sequences : (batch, features, frames) torch.Tensor
-            Sequences of features.
-        weights : (batch, frames) torch.Tensor
-            (Already interpolated) weights.
-
-        Returns
+        sequences : torch.Tensor
+            特征序列，形状为(batch, features, frames)
+        weights : torch.Tensor
+            权重，形状为(batch, frames)
+            应该已经插值到与sequences相同的帧数
+            编码单个说话人的激活（0-1之间）
+        
+        返回
         -------
-        output : (batch, 2 * features) torch.Tensor
-            Concatenation of mean and (unbiased) standard deviation.
+        torch.Tensor
+            拼接后的统计特征，形状为(batch, 2 * features)
+            [均值, 标准差]
+        
+        算法
+        -----
+        1. 计算加权均值：mean = sum(sequences * weights) / sum(weights)
+        2. 计算加权方差：var = sum((sequences - mean)^2 * weights) / (v1 - v2/v1)
+        3. 计算标准差：std = sqrt(var)
+        4. 拼接：output = [mean, std]
+        
+        注意
+        -----
+        使用无偏方差估计，考虑权重的归一化
         """
 
         weights = weights.unsqueeze(dim=1)
@@ -77,26 +104,39 @@ class StatsPool(nn.Module):
     def forward(
         self, sequences: torch.Tensor, weights: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
-        """Forward pass
-
-        Parameters
+        """前向传播
+        
+        计算时序特征的统计池化（均值和标准差）。
+        
+        参数
         ----------
-        sequences : (batch, features, frames) torch.Tensor
-            Sequences of features.
-        weights : (batch, frames) or (batch, speakers, frames) torch.Tensor, optional
-            Compute weighted mean and standard deviation, using provided `weights`.
-
-        Note
+        sequences : torch.Tensor
+            特征序列，形状为(batch, features, frames)
+        weights : torch.Tensor, 可选
+            权重，形状为：
+            - (batch, frames)：单说话人情况
+            - (batch, speakers, frames)：多说话人情况
+            如果提供，使用加权统计；否则使用均匀权重
+        
+        注意
         ----
-        `sequences` and `weights` might use a different number of frames, in which case `weights`
-        are interpolated linearly to reach the number of frames in `sequences`.
-
-        Returns
+        `sequences`和`weights`可能使用不同的帧数，
+        在这种情况下，`weights`会线性插值以匹配`sequences`的帧数。
+        
+        返回
         -------
-        output : (batch, 2 * features) or (batch, speakers, 2 * features) torch.Tensor
-            Concatenation of mean and (unbiased) standard deviation. When `weights` are
-            provided with the `speakers` dimension, `output` is computed for each speaker
-            separately and returned as (batch, speakers, 2 * channel)-shaped tensor.
+        torch.Tensor
+            统计特征，形状为：
+            - (batch, 2 * features)：单说话人情况
+            - (batch, speakers, 2 * features)：多说话人情况
+            当`weights`包含`speakers`维度时，为每个说话人单独计算统计特征
+        
+        处理流程
+        --------
+        1. 如果提供了weights且帧数不匹配，线性插值weights
+        2. 如果是多说话人情况，为每个说话人单独调用_pool
+        3. 如果是单说话人情况，直接调用_pool
+        4. 返回拼接的[均值, 标准差]
         """
 
         if weights is None:

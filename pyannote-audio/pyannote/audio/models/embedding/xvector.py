@@ -43,6 +43,50 @@ from pyannote.audio.utils.receptive_field import (
 
 
 class XVectorMFCC(Model):
+    """X-Vector嵌入模型（基于MFCC特征）
+    
+    经典的说话人嵌入模型，架构为：
+    MFCC（手工特征） → TDNN（时延神经网络） → Stats Pooling（统计池化） → Embedding（嵌入层）
+    
+    特点：
+    - 传统方法：使用MFCC手工特征
+    - 轻量级：模型小，速度快
+    - 稳定：经过充分验证的架构
+    
+    参数
+    ----------
+    sample_rate : int, 默认16000
+        音频采样率（Hz）
+    num_channels : int, 默认1
+        音频通道数
+    mfcc : dict, 可选
+        MFCC特征提取参数
+        默认：{"n_mfcc": 40, "dct_type": 2, "norm": "ortho", "log_mels": False}
+        - n_mfcc: MFCC系数数量（40）
+        - dct_type: DCT类型（2）
+        - norm: 归一化方式（"ortho"）
+        - log_mels: 是否对mel谱取对数（False）
+    dimension : int, 默认512
+        输出嵌入向量维度
+    
+    架构说明
+    --------
+    1. MFCC: 提取40维MFCC特征（手工特征）
+    2. TDNN: 5层时延神经网络
+       - 层1: 40 → 512（kernel=5, dilation=1）
+       - 层2: 512 → 512（kernel=3, dilation=2）
+       - 层3: 512 → 512（kernel=3, dilation=3）
+       - 层4: 512 → 512（kernel=1, dilation=1）
+       - 层5: 512 → 1500（kernel=1, dilation=1）
+    3. Stats Pooling: 统计池化（均值+标准差，1500*2=3000维）
+    4. Embedding: 线性层（3000 → dimension）
+    
+    参考
+    -----
+    Snyder, D., et al. (2018).
+    "X-vectors: Robust DNN embeddings for speaker recognition."
+    IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP).
+    """
     MFCC_DEFAULTS = {"n_mfcc": 40, "dct_type": 2, "norm": "ortho", "log_mels": False}
 
     def __init__(
@@ -55,21 +99,22 @@ class XVectorMFCC(Model):
     ):
         super().__init__(sample_rate=sample_rate, num_channels=num_channels, task=task)
 
+        # ========== MFCC特征提取 ==========
         mfcc = merge_dict(self.MFCC_DEFAULTS, mfcc)
         mfcc["sample_rate"] = sample_rate
-
         self.save_hyperparameters("mfcc", "dimension")
-
         self.mfcc = MFCC(**self.hparams.mfcc)
 
+        # ========== TDNN层构建 ==========
         self.tdnns = nn.ModuleList()
-        in_channel = self.hparams.mfcc["n_mfcc"]
-        out_channels = [512, 512, 512, 512, 1500]
-        self.kernel_size = [5, 3, 3, 1, 1]
-        self.dilation = [1, 2, 3, 1, 1]
-        self.padding = [0, 0, 0, 0, 0]
-        self.stride = [1, 1, 1, 1, 1]
+        in_channel = self.hparams.mfcc["n_mfcc"]  # 输入：40维MFCC
+        out_channels = [512, 512, 512, 512, 1500]  # 各层输出通道数
+        self.kernel_size = [5, 3, 3, 1, 1]  # 卷积核大小
+        self.dilation = [1, 2, 3, 1, 1]  # 膨胀率
+        self.padding = [0, 0, 0, 0, 0]  # 填充
+        self.stride = [1, 1, 1, 1, 1]  # 步长
 
+        # 构建5层TDNN
         for out_channel, kernel_size, dilation in zip(
             out_channels, self.kernel_size, self.dilation
         ):
@@ -79,16 +124,17 @@ class XVectorMFCC(Model):
                         in_channels=in_channel,
                         out_channels=out_channel,
                         kernel_size=kernel_size,
-                        dilation=dilation,
+                        dilation=dilation,  # 使用膨胀卷积扩大感受野
                     ),
-                    nn.LeakyReLU(),
-                    nn.BatchNorm1d(out_channel),
+                    nn.LeakyReLU(),  # LeakyReLU激活函数
+                    nn.BatchNorm1d(out_channel),  # 批归一化
                 ]
             )
             in_channel = out_channel
 
-        self.stats_pool = StatsPool()
-
+        # ========== 统计池化和嵌入层 ==========
+        self.stats_pool = StatsPool()  # 统计池化（均值+标准差）
+        # 嵌入层：1500*2（统计池化输出） → dimension（最终嵌入维度）
         self.embedding = nn.Linear(in_channel * 2, self.hparams.dimension)
 
     @property

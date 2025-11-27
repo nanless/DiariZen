@@ -39,78 +39,133 @@ from pyannote.audio.utils.signal import Binarize
 
 
 def to_overlap(annotation: Annotation) -> Annotation:
-    """Get overlapped speech regions
-
-    Parameters
+    """从说话人标注中提取重叠语音区域
+    
+    通过查找同时有多个不同说话人活跃的时间段来识别重叠语音。
+    
+    参数
     ----------
     annotation : Annotation
-        Speaker annotation.
-
-    Returns
+        说话人标注（包含多个说话人的时间线）
+    
+    返回
     -------
-    overlap : Annotation
-        Overlapped speech annotation.
+    Annotation
+        重叠语音标注，标签为"overlap"
+    
+    算法
+    -----
+    1. 遍历所有说话人段对
+    2. 如果两个段来自不同说话人且时间重叠，记录重叠部分
+    3. 合并所有重叠区域并转换为Annotation格式
+    
+    应用场景
+    --------
+    - 从真实标注生成重叠语音标注（用于训练/评估）
+    - 分析音频中的重叠语音比例
     """
-
     overlap = Timeline(uri=annotation.uri)
+    # 遍历所有说话人段对
     for (s1, t1), (s2, t2) in annotation.co_iter(annotation):
-        l1 = annotation[s1, t1]
-        l2 = annotation[s2, t2]
+        l1 = annotation[s1, t1]  # 段1的说话人标签
+        l2 = annotation[s2, t2]  # 段2的说话人标签
         if l1 == l2:
-            continue
+            continue  # 跳过同一说话人的段
+        # 添加重叠部分（两个段的交集）
         overlap.add(s1 & s2)
+    # 合并重叠区域并转换为Annotation格式
     return overlap.support().to_annotation(generator="string", modality="overlap")
 
 
 class OracleOverlappedSpeechDetection(Pipeline):
-    """Oracle overlapped speech detection pipeline"""
+    """Oracle（完美）重叠语音检测管道
+    
+    这是一个理想化的重叠语音检测管道，直接从真实标注中提取重叠语音区域。
+    主要用于：
+    - 性能上限评估（upper bound）
+    - 对比实验
+    - 调试和测试
+    
+    注意
+    -----
+    这不是一个实际的检测系统，而是使用真实标注作为"预测"结果。
+    """
 
     def apply(self, file: AudioFile) -> Annotation:
-        """Return groundtruth overlapped speech detection
-
-        Parameter
+        """返回真实标注的重叠语音检测结果
+        
+        参数
         ---------
         file : AudioFile
-            Must provide a "annotation" key.
-
-        Returns
+            音频文件，必须包含"annotation"键（真实说话人标注）
+        
+        返回
         -------
-        hypothesis : Annotation
-            Overlapped speech regions.
+        Annotation
+            重叠语音区域标注（从真实标注中提取）
+        
+        处理流程
+        --------
+        1. 从文件获取真实说话人标注
+        2. 使用to_overlap函数提取重叠语音区域
+        3. 返回重叠语音标注
         """
         return to_overlap(file["annotation"])
 
 
 class OverlappedSpeechDetection(Pipeline):
-    """Overlapped speech detection pipeline
-
-    Parameters
+    """重叠语音检测管道
+    
+    从音频中检测重叠语音区域（多个说话人同时说话的时间段）。
+    使用分割模型预测每个时间帧的重叠概率，然后通过滞后阈值二值化得到最终的重叠/非重叠标签。
+    
+    参数
     ----------
-    segmentation : Model, str, or dict, optional
-        Pretrained segmentation (or overlapped speech detection) model.
-        Defaults to "pyannote/segmentation".
-        See pyannote.audio.pipelines.utils.get_model for supported format.
-    precision : float, optional
-        Optimize recall at target precision.
-        Defaults to optimize precision/recall fscore.
-    recall : float, optional
-        Optimize precision at target recall
-        Defaults to optimize precision/recall fscore
-    use_auth_token : str, optional
-        When loading private huggingface.co models, set `use_auth_token`
-        to True or to a string containing your hugginface.co authentication
-        token that can be obtained by running `huggingface-cli login`
-    inference_kwargs : dict, optional
-        Keywords arguments passed to Inference.
-
-    Hyper-parameters
+    segmentation : Model, str, 或 dict, 默认"pyannote/segmentation"
+        预训练分割模型（或重叠语音检测模型）
+        支持格式见 pyannote.audio.pipelines.utils.get_model
+    precision : float, 可选
+        目标精确率。如果设置，将在目标精确率下优化召回率
+        默认：优化精确率/召回率F-score
+    recall : float, 可选
+        目标召回率。如果设置，将在目标召回率下优化精确率
+        默认：优化精确率/召回率F-score
+        注意：precision和recall不能同时设置
+    use_auth_token : str, 可选
+        当加载私有HuggingFace模型时，设置认证token
+        可以通过运行`huggingface-cli login`获取
+    inference_kwargs : dict, 可选
+        传递给Inference的关键字参数
+    
+    超参数
     ----------------
-    onset, offset : float
-        Onset/offset detection thresholds
+    onset : float
+        重叠开始检测阈值（0.0-1.0）
+        当模型输出超过此阈值时，标记为重叠开始
+    offset : float
+        重叠结束检测阈值（0.0-1.0）
+        当模型输出低于此阈值时，标记为重叠结束
+        通常offset < onset（滞后阈值）
     min_duration_on : float
-        Remove speech regions shorter than that many seconds.
+        最小重叠持续时间（秒）
+        短于此时间的重叠区域将被移除
     min_duration_off : float
-        Fill non-speech regions shorter than that many seconds.
+        最小非重叠持续时间（秒）
+        短于此时间的非重叠间隙将被填充为重叠
+    
+    工作流程
+    --------
+    1. 使用分割模型获取每个时间帧的重叠概率
+    2. 如果模型输出维度>1，使用第二高的分数（表示重叠）
+    3. 使用滞后阈值（onset/offset）进行二值化
+    4. 后处理：移除过短的重叠区域，填充过短的非重叠间隙
+    5. 返回最终的重叠语音区域标注
+    
+    应用场景
+    --------
+    - 说话人分离预处理（识别重叠区域）
+    - 音频质量评估（计算重叠比例）
+    - 会议分析（识别多人同时说话）
     """
 
     def __init__(

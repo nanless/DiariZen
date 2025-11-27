@@ -1,0 +1,312 @@
+{
+  "root_dir": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50",
+  "rttm_out_dir": "/root/code/github_repos/DiariZen/rttm_out",
+  "items": [
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00002_speech_estimate.wav",
+      "session_name": "00002_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00002_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00029_speech_estimate.wav",
+      "session_name": "00029_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00029_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00033_speech_estimate.wav",
+      "session_name": "00033_speech_estimate",
+      "num_speakers": 3,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00033_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00071_speech_estimate.wav",
+      "session_name": "00071_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00071_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00076_speech_estimate.wav",
+      "session_name": "00076_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00076_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00085_193_0_1_speech_estimate.wav",
+      "session_name": "00085_193_0_1_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00085_193_0_1_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00090_speech_estimate.wav",
+      "session_name": "00090_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00090_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00103_97_0_1_speech_estimate.wav",
+      "session_name": "00103_97_0_1_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00103_97_0_1_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00126_speech_estimate.wav",
+      "session_name": "00126_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00126_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00131_speech_estimate.wav",
+      "session_name": "00131_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00131_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00138_speech_estimate.wav",
+      "session_name": "00138_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00138_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00141_speech_estimate.wav",
+      "session_name": "00141_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00141_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00221_speech_estimate.wav",
+      "session_name": "00221_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00221_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00238_speech_estimate.wav",
+      "session_name": "00238_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00238_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00252_speech_estimate.wav",
+      "session_name": "00252_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00252_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00258_speech_estimate.wav",
+      "session_name": "00258_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00258_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00280_speech_estimate.wav",
+      "session_name": "00280_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00280_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00284_speech_estimate.wav",
+      "session_name": "00284_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00284_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00297_speech_estimate.wav",
+      "session_name": "00297_speech_estimate",
+      "num_speakers": 1,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00297_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00298_128_0_1_speech_estimate.wav",
+      "session_name": "00298_128_0_1_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00298_128_0_1_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00298_speech_estimate.wav",
+      "session_name": "00298_speech_estimate",
+      "num_speakers": 1,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00298_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00305_speech_estimate.wav",
+      "session_name": "00305_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00305_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00524_speech_estimate.wav",
+      "session_name": "00524_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00524_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00550_speech_estimate.wav",
+      "session_name": "00550_speech_estimate",
+      "num_speakers": 3,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00550_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00555_speech_estimate.wav",
+      "session_name": "00555_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00555_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00561_speech_estimate.wav",
+      "session_name": "00561_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00561_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00586_speech_estimate.wav",
+      "session_name": "00586_speech_estimate",
+      "num_speakers": 1,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00586_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00597_speech_estimate.wav",
+      "session_name": "00597_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00597_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00670_155_0_1_speech_estimate.wav",
+      "session_name": "00670_155_0_1_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00670_155_0_1_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00670_speech_estimate.wav",
+      "session_name": "00670_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00670_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00688_speech_estimate.wav",
+      "session_name": "00688_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00688_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00716_speech_estimate.wav",
+      "session_name": "00716_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00716_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00736_speech_estimate.wav",
+      "session_name": "00736_speech_estimate",
+      "num_speakers": 3,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00736_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00755_speech_estimate.wav",
+      "session_name": "00755_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00755_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00786_speech_estimate.wav",
+      "session_name": "00786_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00786_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00803_speech_estimate.wav",
+      "session_name": "00803_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00803_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00806_speech_estimate.wav",
+      "session_name": "00806_speech_estimate",
+      "num_speakers": 3,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00806_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00825_speech_estimate.wav",
+      "session_name": "00825_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00825_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00882_speech_estimate.wav",
+      "session_name": "00882_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00882_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00894_speech_estimate.wav",
+      "session_name": "00894_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00894_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00910_speech_estimate.wav",
+      "session_name": "00910_speech_estimate",
+      "num_speakers": 1,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00910_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00932_speech_estimate.wav",
+      "session_name": "00932_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00932_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/00938_178_0_1_speech_estimate.wav",
+      "session_name": "00938_178_0_1_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/00938_178_0_1_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/baichuan_2Fprod_2Fai-class-info_2Fg3_2F0_2F2_2F361982_2F1763340_2Fstudent_1961300577589665851_20250829_152706_7797126a-e246-4a75-92d0-0296279b60c6_speech_estimate.wav",
+      "session_name": "baichuan_2Fprod_2Fai-class-info_2Fg3_2F0_2F2_2F361982_2F1763340_2Fstudent_1961300577589665851_20250829_152706_7797126a-e246-4a75-92d0-0296279b60c6_speech_estimate",
+      "num_speakers": 1,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/baichuan_2Fprod_2Fai-class-info_2Fg3_2F0_2F2_2F361982_2F1763340_2Fstudent_1961300577589665851_20250829_152706_7797126a-e246-4a75-92d0-0296279b60c6_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/baichuan_2Fprod_2Fai-class-info_2Fg3_2F0_2F2_2F361982_2F1763340_2Fstudent_1962117809198600291_20250831_202235_29a48d55-ada8-45c2-80b3-e842796ac658_speech_estimate.wav",
+      "session_name": "baichuan_2Fprod_2Fai-class-info_2Fg3_2F0_2F2_2F361982_2F1763340_2Fstudent_1962117809198600291_20250831_202235_29a48d55-ada8-45c2-80b3-e842796ac658_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/baichuan_2Fprod_2Fai-class-info_2Fg3_2F0_2F2_2F361982_2F1763340_2Fstudent_1962117809198600291_20250831_202235_29a48d55-ada8-45c2-80b3-e842796ac658_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/数学_0528_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1963920173152862263_20250905_194527_dd1e6c05-e2b4-417d-a373-e09935c0b1a9_speech_estimate.wav",
+      "session_name": "数学_0528_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1963920173152862263_20250905_194527_dd1e6c05-e2b4-417d-a373-e09935c0b1a9_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/数学_0528_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1963920173152862263_20250905_194527_dd1e6c05-e2b4-417d-a373-e09935c0b1a9_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/数学_1422_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1963935317710872635_20250905_202709_c6e0f221-12dd-423d-8f5a-50754a0da4d9_speech_estimate.wav",
+      "session_name": "数学_1422_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1963935317710872635_20250905_202709_c6e0f221-12dd-423d-8f5a-50754a0da4d9_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/数学_1422_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1963935317710872635_20250905_202709_c6e0f221-12dd-423d-8f5a-50754a0da4d9_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/物理_0040_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1964201029788512285_20250906_134158_3d129d96-2fb9-4458-a28e-5f294ff6b6ca_speech_estimate.wav",
+      "session_name": "物理_0040_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1964201029788512285_20250906_134158_3d129d96-2fb9-4458-a28e-5f294ff6b6ca_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/物理_0040_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1964201029788512285_20250906_134158_3d129d96-2fb9-4458-a28e-5f294ff6b6ca_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/物理_2257_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1964124693292130377_20250906_084012_4a11bf87-eaa8-49bd-a4f5-ad14359522f2_speech_estimate.wav",
+      "session_name": "物理_2257_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1964124693292130377_20250906_084012_4a11bf87-eaa8-49bd-a4f5-ad14359522f2_speech_estimate",
+      "num_speakers": 1,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/物理_2257_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1964124693292130377_20250906_084012_4a11bf87-eaa8-49bd-a4f5-ad14359522f2_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/物理_3435_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1963920539454017597_20250905_194010_247d886c-b9db-4645-b4bd-97afa28e3e01_speech_estimate.wav",
+      "session_name": "物理_3435_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1963920539454017597_20250905_194010_247d886c-b9db-4645-b4bd-97afa28e3e01_speech_estimate",
+      "num_speakers": 2,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/物理_3435_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1963920539454017597_20250905_194010_247d886c-b9db-4645-b4bd-97afa28e3e01_speech_estimate.rttm"
+    },
+    {
+      "wav_path": "/root/workspace/speech_enhancement/sc/merged_datasets_20251029/SC_CausalMelBandRNN_EDA_16k/inference/from_unlabeled_dir_0005_selected50/语文_0143_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1963971323268956197_20250905_223236_f94d9b8f-041d-4047-b128-b733537ed459_speech_estimate.wav",
+      "session_name": "语文_0143_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1963971323268956197_20250905_223236_f94d9b8f-041d-4047-b128-b733537ed459_speech_estimate",
+      "num_speakers": 1,
+      "rttm_path": "/root/code/github_repos/DiariZen/rttm_out/语文_0143_baichuan%2Fprod%2Fai-class-info%2Fg3%2F0%2F2%2F361982%2F1763340%2Fstudent_1963971323268956197_20250905_223236_f94d9b8f-041d-4047-b128-b733537ed459_speech_estimate.rttm"
+    }
+  ]
+}

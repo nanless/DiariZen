@@ -37,60 +37,97 @@ from pyannote.core import SlidingWindowFeature
 
 @singledispatch
 def permutate(y1, y2, cost_func: Optional[Callable] = None, return_cost: bool = False):
-    """Find cost-minimizing permutation
-
-    Parameters
+    """寻找成本最小化的排列（排列不变性处理）
+    
+    在说话人分离任务中，说话人的顺序是任意的（排列不变性）。
+    此函数找到y2到y1的最优排列，使得总成本最小。
+    使用匈牙利算法（Hungarian algorithm）求解最优分配问题。
+    
+    参数
     ----------
-    y1 : np.ndarray or torch.Tensor
-        (batch_size, num_samples, num_classes_1)
-    y2 : np.ndarray or torch.Tensor
-        (num_samples, num_classes_2) or (batch_size, num_samples, num_classes_2)
-    cost_func : callable
-        Takes two (num_samples, num_classes) sequences and returns (num_classes, ) pairwise cost.
-        Defaults to computing mean squared error.
-    return_cost : bool, optional
-        Whether to return cost matrix. Defaults to False.
-
-    Returns
+    y1 : np.ndarray 或 torch.Tensor
+        参考序列，形状为(batch_size, num_samples, num_classes_1)
+    y2 : np.ndarray 或 torch.Tensor
+        待排列序列，形状为：
+        - (num_samples, num_classes_2)：单样本
+        - (batch_size, num_samples, num_classes_2)：批次数据
+    cost_func : callable, 可选
+        成本函数，接收两个(num_samples, num_classes)序列，
+        返回(num_classes,)的成对成本
+        默认使用均方误差（MSE）
+    return_cost : bool, 默认False
+        是否返回成本矩阵
+    
+    返回
     -------
-    permutated_y2 : np.ndarray or torch.Tensor
-        (batch_size, num_samples, num_classes_1)
+    permutated_y2 : np.ndarray 或 torch.Tensor
+        排列后的y2，形状为(batch_size, num_samples, num_classes_1)
     permutations : list of tuple
-        List of permutations so that permutation[i] == j indicates that jth speaker of y2
-        should be mapped to ith speaker of y1.  permutation[i] == None when none of y2 speakers
-        is mapped to ith speaker of y1.
-    cost : np.ndarray or torch.Tensor, optional
-        (batch_size, num_classes_1, num_classes_2)
+        排列列表
+        permutation[i] == j表示y2的第j个说话人应该映射到y1的第i个说话人
+        permutation[i] == None表示y2中没有说话人映射到y1的第i个说话人
+    cost : np.ndarray 或 torch.Tensor, 可选
+        成本矩阵，形状为(batch_size, num_classes_1, num_classes_2)
+        仅在return_cost=True时返回
+    
+    使用场景
+    --------
+    - 训练时：对齐预测和标签的说话人顺序
+    - 评估时：找到最优说话人映射以计算准确指标
+    - 排列不变性：处理说话人顺序不固定的问题
+    
+    算法
+    -----
+    使用匈牙利算法（linear_sum_assignment）求解最优分配问题
     """
     raise TypeError()
 
 
 def mse_cost_func(Y, y, **kwargs):
-    """Compute class-wise mean-squared error
-
-    Parameters
+    """计算类别级别的均方误差
+    
+    用于排列不变性处理的默认成本函数。
+    计算每个说话人（类别）的均方误差。
+    
+    参数
     ----------
-    Y, y : (num_frames, num_classes) torch.tensor
-
-    Returns
+    Y, y : torch.Tensor
+        两个序列，形状为(num_frames, num_classes)
+        Y：参考序列
+        y：待比较序列
+    
+    返回
     -------
-    mse : (num_classes, ) torch.tensor
-        Mean-squared error
+    torch.Tensor
+        每个类别的MSE，形状为(num_classes,)
+    
+    用途
+    -----
+    用于permutate函数，计算说话人之间的匹配成本
     """
     return torch.mean(F.mse_loss(Y, y, reduction="none"), axis=0)
 
 
 def mae_cost_func(Y, y, **kwargs):
-    """Compute class-wise mean absolute difference error
-
-    Parameters
+    """计算类别级别的平均绝对误差
+    
+    另一种成本函数，使用L1距离（平均绝对误差）而非L2距离。
+    
+    参数
     ----------
-    Y, y: (num_frames, num_classes) torch.tensor
-
-    Returns
+    Y, y : torch.Tensor
+        两个序列，形状为(num_frames, num_classes)
+        Y：参考序列
+        y：待比较序列
+    
+    返回
     -------
-    mae : (num_classes, ) torch.tensor
-        Mean absolute difference error
+    torch.Tensor
+        每个类别的MAE，形状为(num_classes,)
+    
+    用途
+    -----
+    用于permutate函数，提供L1距离的匹配成本
     """
     return torch.mean(torch.abs(Y - y), axis=0)
 

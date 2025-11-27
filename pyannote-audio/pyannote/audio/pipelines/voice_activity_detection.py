@@ -57,54 +57,95 @@ from pyannote.audio.utils.signal import Binarize
 
 
 class OracleVoiceActivityDetection(Pipeline):
-    """Oracle voice activity detection pipeline"""
+    """Oracle（完美）语音活动检测管道
+    
+    这是一个理想化的VAD管道，直接返回标注数据中的语音区域。
+    主要用于：
+    - 性能上限评估（upper bound）
+    - 对比实验
+    - 调试和测试
+    
+    注意
+    -----
+    这不是一个实际的VAD系统，而是使用真实标注作为"预测"结果。
+    """
 
     @staticmethod
     def apply(file: AudioFile) -> Annotation:
-        """Return groundtruth voice activity detection
-
-        Parameter
+        """返回真实标注的语音活动检测结果
+        
+        参数
         ---------
         file : AudioFile
-            Must provide a "annotation" key.
-
-        Returns
+            音频文件，必须包含"annotation"键（真实标注）
+        
+        返回
         -------
-        hypothesis : `pyannote.core.Annotation`
-            Speech regions
+        Annotation
+            语音区域标注（从真实标注中提取）
+        
+        处理流程
+        --------
+        1. 从文件获取真实标注
+        2. 提取所有时间线
+        3. 获取支持区域（speech区域）
+        4. 转换为Annotation格式
         """
-
+        # 从真实标注中提取语音时间线
         speech = file["annotation"].get_timeline().support()
+        # 转换为Annotation格式，标签为"speech"
         return speech.to_annotation(generator="string", modality="speech")
 
 
 class VoiceActivityDetection(Pipeline):
-    """Voice activity detection pipeline
-
-    Parameters
+    """语音活动检测（VAD）管道
+    
+    从音频中检测语音区域（speech regions）。
+    使用分割模型预测每个时间帧的语音概率，然后通过滞后阈值二值化得到最终的语音/非语音标签。
+    
+    参数
     ----------
-    segmentation : Model, str, or dict, optional
-        Pretrained segmentation (or voice activity detection) model.
-        Defaults to "pyannote/segmentation".
-        See pyannote.audio.pipelines.utils.get_model for supported format.
-    fscore : bool, optional
-        Optimize (precision/recall) fscore. Defaults to optimizing detection
-        error rate.
-    use_auth_token : str, optional
-        When loading private huggingface.co models, set `use_auth_token`
-        to True or to a string containing your hugginface.co authentication
-        token that can be obtained by running `huggingface-cli login`
-    inference_kwargs : dict, optional
-        Keywords arguments passed to Inference.
-
-    Hyper-parameters
+    segmentation : Model, str, 或 dict, 默认"pyannote/segmentation"
+        预训练分割模型（或VAD模型）
+        支持格式见 pyannote.audio.pipelines.utils.get_model
+    fscore : bool, 默认False
+        是否优化F-score（精确率/召回率）
+        False：优化检测错误率（Detection Error Rate）
+        True：优化F-score（精确率和召回率的调和平均）
+    use_auth_token : str, 可选
+        当加载私有HuggingFace模型时，设置认证token
+        可以通过运行`huggingface-cli login`获取
+    inference_kwargs : dict, 可选
+        传递给Inference的关键字参数
+    
+    超参数
     ----------------
-    onset, offset : float
-        Onset/offset detection thresholds
+    onset : float
+        语音开始检测阈值（0.0-1.0）
+        当模型输出超过此阈值时，标记为语音开始
+    offset : float
+        语音结束检测阈值（0.0-1.0）
+        当模型输出低于此阈值时，标记为语音结束
+        通常offset < onset（滞后阈值）
     min_duration_on : float
-        Remove speech regions shorter than that many seconds.
+        最小语音持续时间（秒）
+        短于此时间的语音区域将被移除
     min_duration_off : float
-        Fill non-speech regions shorter than that many seconds.
+        最小非语音持续时间（秒）
+        短于此时间的非语音间隙将被填充为语音
+    
+    工作流程
+    --------
+    1. 使用分割模型获取每个时间帧的语音概率
+    2. 使用滞后阈值（onset/offset）进行二值化
+    3. 后处理：移除过短的语音区域，填充过短的非语音间隙
+    4. 返回最终的语音区域标注
+    
+    应用场景
+    --------
+    - 语音识别预处理（只处理语音区域）
+    - 说话人分离预处理（定位语音区域）
+    - 音频质量评估（计算语音比例）
     """
 
     def __init__(
@@ -140,16 +181,31 @@ class VoiceActivityDetection(Pipeline):
         self.min_duration_off = Uniform(0.0, 1.0)
 
     def default_parameters(self):
+        """返回默认超参数
+        
+        这些参数是在特定数据集上优化得到的。
+        
+        返回
+        -------
+        dict
+            默认超参数字典
+        
+        注意
+        -----
+        - "pyannote/segmentation": 在DIHARD 3开发集上优化的参数
+        - "pyannote/segmentation-3.0.0": 新版本模型，不需要后处理
+        """
         if self.segmentation == "pyannote/segmentation":
-            # parameters optimized for DIHARD 3 development set
+            # 在DIHARD 3开发集上优化的参数
             return {
-                "onset": 0.767,
-                "offset": 0.377,
-                "min_duration_on": 0.136,
-                "min_duration_off": 0.067,
+                "onset": 0.767,  # 语音开始阈值
+                "offset": 0.377,  # 语音结束阈值
+                "min_duration_on": 0.136,  # 最小语音持续时间（秒）
+                "min_duration_off": 0.067,  # 最小非语音持续时间（秒）
             }
 
         elif self.segmentation == "pyannote/segmentation-3.0.0":
+            # 新版本模型，不需要后处理
             return {
                 "min_duration_on": 0.0,
                 "min_duration_off": 0.0,
@@ -173,25 +229,34 @@ class VoiceActivityDetection(Pipeline):
     CACHED_SEGMENTATION = "cache/segmentation/inference"
 
     def apply(self, file: AudioFile, hook: Optional[Callable] = None) -> Annotation:
-        """Apply voice activity detection
-
-        Parameters
+        """应用语音活动检测
+        
+        对音频文件进行VAD处理，返回语音区域标注。
+        
+        参数
         ----------
         file : AudioFile
-            Processed file.
-        hook : callable, optional
-            Callback called after each major steps of the pipeline as follows:
-                hook(step_name,      # human-readable name of current step
-                     step_artefact,  # artifact generated by current step
-                     file=file)      # file being processed
-            Time-consuming steps call `hook` multiple times with the same `step_name`
-            and additional `completed` and `total` keyword arguments usable to track
-            progress of current step.
-
-        Returns
+            待处理的音频文件
+        hook : callable, 可选
+            回调函数，在每个主要步骤后调用
+            调用格式：
+                hook(step_name,      # 当前步骤的可读名称
+                     step_artefact,  # 当前步骤生成的产物
+                     file=file)      # 正在处理的文件
+            耗时步骤会多次调用hook，使用相同的step_name
+            并提供额外的completed和total参数用于跟踪进度
+        
+        返回
         -------
-        speech : Annotation
-            Speech regions.
+        Annotation
+            语音区域标注，标签为"SPEECH"
+        
+        处理步骤
+        --------
+        1. 应用分割模型获取语音概率分数
+        2. 使用滞后阈值二值化
+        3. 后处理（移除短语音区域，填充短间隙）
+        4. 返回最终标注
         """
 
         # setup hook (e.g. for debugging purposes)
@@ -233,50 +298,62 @@ class VoiceActivityDetection(Pipeline):
 
 
 class AdaptiveVoiceActivityDetection(Pipeline):
-    """Adaptive voice activity detection pipeline
-
-    Let M be a pretrained voice activity detection model.
-
-    For each file f, this pipeline starts by applying the model to obtain a first set of
-    speech/non-speech labels.
-
-    Those (automatic, possibly erroneous) labels are then used to fine-tune M on the very
-    same file f into a M_f model, in a self-supervised manner.
-
-    Finally, the fine-tuned model M_f is applied to file f to obtain the final (and
-    hopefully better) speech/non-speech labels.
-
-    During fine-tuning, frames where the pretrained model M is very confident are weighted
-    more than those with lower confidence: the intuition is that the model will use these
-    high confidence regions to adapt to recording conditions (e.g. background noise) and
-    hence will eventually be better on the parts of f where it was initially not quite
-    confident.
-
-    Conversely, to avoid overfitting too much to those high confidence regions, we use
-    data augmentation and freeze all but the final few layers of the pretrained model M.
-
-    Parameters
+    """自适应语音活动检测管道
+    
+    这是一个自适应的VAD管道，会对每个文件进行模型微调以提高性能。
+    
+    工作原理
+    --------
+    设M为预训练的VAD模型。
+    
+    对于每个文件f：
+    1. 首先应用预训练模型M，获得初始的语音/非语音标签
+    2. 使用这些（自动生成的，可能包含错误的）标签，以自监督方式在文件f上微调M，得到M_f
+    3. 最后，应用微调后的模型M_f到文件f，获得最终（希望更好的）语音/非语音标签
+    
+    微调策略
+    --------
+    - 置信度加权：预训练模型M高置信度的帧被赋予更高权重
+      直觉：模型将使用这些高置信度区域适应录音条件（如背景噪声），
+      从而在最初不太自信的部分表现更好
+    - 防止过拟合：
+      - 使用数据增强
+      - 冻结除最后几层外的所有层（渐进式解冻）
+    
+    参数
     ----------
-    segmentation : Model, str, or dict, optional
-        Pretrained segmentation model.
-        Defaults to "hbredin/VoiceActivityDetection-PyanNet-DIHARD".
-    augmentation : BaseWaveformTransform, or dict, optional
-        torch_audiomentations waveform transform, used during fine-tuning.
-        Defaults to no augmentation.
-    fscore : bool, optional
-        Optimize (precision/recall) fscore.
-        Defaults to optimizing detection error rate.
-
-    Hyper-parameters
+    segmentation : Model, str, 或 dict, 默认"hbredin/VoiceActivityDetection-PyanNet-DIHARD"
+        预训练分割模型
+    augmentation : BaseWaveformTransform, 或 dict, 可选
+        torch_audiomentations波形变换，用于微调时的数据增强
+        默认为None（不使用增强）
+    fscore : bool, 默认False
+        是否优化F-score
+        False：优化检测错误率
+        True：优化F-score
+    
+    超参数
     ----------------
     num_epochs : int
-        Number of epochs (where one epoch = going through the file once).
+        微调轮数（一轮 = 遍历文件一次）
     batch_size : int
-        Batch size.
+        批次大小
     learning_rate : float
-        Learning rate.
-
-    See also
+        学习率
+    
+    适用场景
+    --------
+    - 单个文件的精确VAD（可以花时间微调）
+    - 录音条件特殊的文件（需要适应）
+    - 对准确率要求极高的场景
+    
+    注意
+    -----
+    - 每个文件都需要微调，计算成本较高
+    - 不适合批量处理大量文件
+    - 需要GPU支持（微调过程）
+    
+    参考
     --------
     pyannote.audio.pipelines.utils.get_inference
     """

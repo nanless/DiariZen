@@ -41,36 +41,57 @@ from .utils import PipelineModel, get_model
 
 
 class MultiLabelSegmentation(Pipeline):
-    """Generic multi-label segmentation
-
-    Parameters
+    """通用多标签分割管道
+    
+    对音频进行多标签分割，可以同时检测多个类别（标签）。
+    每个类别独立进行滞后阈值二值化和后处理。
+    
+    参数
     ----------
-    segmentation : Model, str, or dict
-        Pretrained multi-label segmentation model.
-        See pyannote.audio.pipelines.utils.get_model for supported format.
-    fscore : bool, optional
-        Optimize for average (precision/recall) fscore, over all classes.
-        Defaults to optimizing identification error rate.
-    share_min_duration : bool, optional
-        If True, `min_duration_on` and `min_duration_off` are shared among labels.
-    use_auth_token : str, optional
-        When loading private huggingface.co models, set `use_auth_token`
-        to True or to a string containing your hugginface.co authentication
-        token that can be obtained by running `huggingface-cli login`
-    inference_kwargs : dict, optional
-        Keywords arguments passed to Inference.
-
-    Hyper-parameters
+    segmentation : Model, str, 或 dict
+        预训练多标签分割模型
+        支持格式见 pyannote.audio.pipelines.utils.get_model
+    fscore : bool, 默认False
+        是否优化所有类别的平均F-score（精确率/召回率）
+        False：优化识别错误率（Identification Error Rate）
+        True：优化宏平均F-score
+    share_min_duration : bool, 默认False
+        如果为True，`min_duration_on`和`min_duration_off`在所有标签间共享
+        如果为False，每个标签有独立的`min_duration_on`和`min_duration_off`参数
+    use_auth_token : str, 可选
+        当加载私有HuggingFace模型时，设置认证token
+        可以通过运行`huggingface-cli login`获取
+    inference_kwargs : dict, 可选
+        传递给Inference的关键字参数
+    
+    超参数
     ----------------
-    Each {label} of the segmentation model is assigned four hyper-parameters:
-    onset, offset : float
-        Onset/offset detection thresholds
-    min_duration_on : float
-        Remove {label} regions shorter than that many seconds.
-        Shared between labels if `share_min_duration` is `True`.
-    min_duration_off : float
-        Fill non-{label} regions shorter than that many seconds.
-        Shared between labels if `share_min_duration` is `True`.
+    每个标签{label}分配四个超参数：
+    {label}.onset, {label}.offset : float
+        标签的起始/结束检测阈值（0.0-1.0）
+    {label}.min_duration_on : float
+        移除短于此时间的{label}区域（秒）
+        如果`share_min_duration`为True，所有标签共享此参数
+    {label}.min_duration_off : float
+        填充短于此时间的非{label}间隙（秒）
+        如果`share_min_duration`为True，所有标签共享此参数
+    
+    工作流程
+    --------
+    1. 使用分割模型获取每个时间帧的多标签概率分数
+    2. 对每个标签独立进行：
+       a. 提取该标签的概率分数
+       b. 使用滞后阈值（onset/offset）进行二值化
+       c. 后处理（移除短区域，填充短间隙）
+    3. 合并所有标签的检测结果
+    4. 返回最终的多标签标注
+    
+    应用场景
+    --------
+    - 多类别事件检测（如笑声、咳嗽、音乐等）
+    - 多说话人活动检测
+    - 音频场景分析
+    - 情感识别（多标签情感）
     """
 
     def __init__(

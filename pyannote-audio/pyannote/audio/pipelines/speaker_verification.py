@@ -66,6 +66,23 @@ except ImportError:
 
 
 class NeMoPretrainedSpeakerEmbedding(BaseInference):
+    """NeMo预训练说话人嵌入模型
+    
+    使用NVIDIA NeMo框架的预训练说话人嵌入模型。
+    NeMo提供了高质量的说话人识别模型。
+    
+    参数
+    ----------
+    embedding : str, 默认"nvidia/speakerverification_en_titanet_large"
+        NeMo模型名称或路径
+    device : torch.device, 可选
+        计算设备（CPU或GPU）
+    
+    注意
+    -----
+    需要安装NeMo库才能使用
+    访问 https://nvidia.github.io/NeMo/ 获取安装说明
+    """
     def __init__(
         self,
         embedding: Text = "nvidia/speakerverification_en_titanet_large",
@@ -203,32 +220,42 @@ class NeMoPretrainedSpeakerEmbedding(BaseInference):
 
 
 class SpeechBrainPretrainedSpeakerEmbedding(BaseInference):
-    """Pretrained SpeechBrain speaker embedding
-
-    Parameters
+    """SpeechBrain预训练说话人嵌入模型
+    
+    使用SpeechBrain框架的预训练说话人嵌入模型。
+    SpeechBrain提供了多种高质量的说话人识别模型（如ECAPA-TDNN）。
+    
+    参数
     ----------
-    embedding : str
-        Name of SpeechBrain model
-    device : torch.device, optional
-        Device
-    use_auth_token : str, optional
-        When loading private huggingface.co models, set `use_auth_token`
-        to True or to a string containing your hugginface.co authentication
-        token that can be obtained by running `huggingface-cli login`
-
-    Usage
+    embedding : str, 默认"speechbrain/spkrec-ecapa-voxceleb"
+        SpeechBrain模型名称
+        支持HuggingFace Hub上的模型ID
+    device : torch.device, 可选
+        计算设备（CPU或GPU）
+    use_auth_token : str, 可选
+        当加载私有HuggingFace模型时，设置认证token
+        可以通过运行`huggingface-cli login`获取
+    
+    使用示例
     -----
+    >>> # 创建嵌入提取器
     >>> get_embedding = SpeechBrainPretrainedSpeakerEmbedding("speechbrain/spkrec-ecapa-voxceleb")
+    >>> # 提取嵌入（无掩码）
     >>> assert waveforms.ndim == 3
     >>> batch_size, num_channels, num_samples = waveforms.shape
     >>> assert num_channels == 1
     >>> embeddings = get_embedding(waveforms)
     >>> assert embeddings.ndim == 2
     >>> assert embeddings.shape[0] == batch_size
-
+    >>> # 提取嵌入（带掩码，只使用活跃区域）
     >>> assert binary_masks.ndim == 1
     >>> assert binary_masks.shape[0] == batch_size
     >>> embeddings = get_embedding(waveforms, masks=binary_masks)
+    
+    注意
+    -----
+    需要安装speechbrain库才能使用
+    访问 https://speechbrain.github.io 获取安装说明
     """
 
     def __init__(
@@ -383,28 +410,46 @@ class SpeechBrainPretrainedSpeakerEmbedding(BaseInference):
 
 
 class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
-    """Pretrained WeSpeaker speaker embedding
-
-    Parameters
+    """ONNX格式的WeSpeaker预训练说话人嵌入模型
+    
+    使用ONNX Runtime运行WeSpeaker模型，提供高效的推理速度。
+    WeSpeaker是WeNet团队开发的说话人识别工具包。
+    
+    参数
     ----------
     embedding : str
-        Path to WeSpeaker pretrained speaker embedding
-    device : torch.device, optional
-        Device
-
-    Usage
+        WeSpeaker预训练模型路径或HuggingFace模型ID
+        例如："hbredin/wespeaker-voxceleb-resnet34-LM"
+    device : torch.device, 可选
+        计算设备（CPU或GPU）
+        支持CUDA加速（如果安装了onnxruntime-gpu）
+    
+    使用示例
     -----
+    >>> # 创建嵌入提取器
     >>> get_embedding = ONNXWeSpeakerPretrainedSpeakerEmbedding("hbredin/wespeaker-voxceleb-resnet34-LM")
+    >>> # 提取嵌入（无掩码）
     >>> assert waveforms.ndim == 3
     >>> batch_size, num_channels, num_samples = waveforms.shape
     >>> assert num_channels == 1
     >>> embeddings = get_embedding(waveforms)
     >>> assert embeddings.ndim == 2
     >>> assert embeddings.shape[0] == batch_size
-
+    >>> # 提取嵌入（带掩码）
     >>> assert binary_masks.ndim == 1
     >>> assert binary_masks.shape[0] == batch_size
     >>> embeddings = get_embedding(waveforms, masks=binary_masks)
+    
+    特点
+    -----
+    - 使用ONNX Runtime，推理速度快
+    - 支持CPU和GPU加速
+    - 使用FBank特征（而非原始波形）
+    
+    注意
+    -----
+    需要安装onnxruntime库才能使用
+    对于GPU加速，需要安装onnxruntime-gpu
     """
 
     def __init__(
@@ -610,32 +655,46 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
 
 
 class PyannoteAudioPretrainedSpeakerEmbedding(BaseInference):
-    """Pretrained pyannote.audio speaker embedding
-
-    Parameters
+    """pyannote.audio预训练说话人嵌入模型
+    
+    使用pyannote.audio框架训练的说话人嵌入模型。
+    这是pyannote.audio原生的嵌入模型接口。
+    
+    参数
     ----------
     embedding : PipelineModel
-        pyannote.audio model
-    device : torch.device, optional
-        Device
-    use_auth_token : str, optional
-        When loading private huggingface.co models, set `use_auth_token`
-        to True or to a string containing your hugginface.co authentication
-        token that can be obtained by running `huggingface-cli login`
-
-    Usage
+        pyannote.audio模型
+        可以是：
+        - HuggingFace模型ID（如"pyannote/embedding"）
+        - 模型路径
+        - Model实例
+    device : torch.device, 可选
+        计算设备（CPU或GPU）
+    use_auth_token : str, 可选
+        当加载私有HuggingFace模型时，设置认证token
+        可以通过运行`huggingface-cli login`获取
+    
+    使用示例
     -----
+    >>> # 创建嵌入提取器
     >>> get_embedding = PyannoteAudioPretrainedSpeakerEmbedding("pyannote/embedding")
+    >>> # 提取嵌入（无掩码）
     >>> assert waveforms.ndim == 3
     >>> batch_size, num_channels, num_samples = waveforms.shape
     >>> assert num_channels == 1
     >>> embeddings = get_embedding(waveforms)
     >>> assert embeddings.ndim == 2
     >>> assert embeddings.shape[0] == batch_size
-
+    >>> # 提取嵌入（带掩码，只使用活跃区域）
     >>> assert masks.ndim == 1
     >>> assert masks.shape[0] == batch_size
     >>> embeddings = get_embedding(waveforms, masks=masks)
+    
+    特点
+    -----
+    - 原生pyannote.audio模型接口
+    - 支持多种模型格式
+    - 自动处理设备管理
     """
 
     def __init__(
@@ -710,37 +769,61 @@ def PretrainedSpeakerEmbedding(
     device: Optional[torch.device] = None,
     use_auth_token: Union[Text, None] = None,
 ):
-    """Pretrained speaker embedding
-
-    Parameters
+    """预训练说话人嵌入模型的统一工厂函数
+    
+    根据模型名称自动选择合适的嵌入模型实现类。
+    支持多种预训练模型框架。
+    
+    参数
     ----------
-    embedding : Text
-        Can be a SpeechBrain (e.g. "speechbrain/spkrec-ecapa-voxceleb")
-        or a pyannote.audio model.
-    device : torch.device, optional
-        Device
-    use_auth_token : str, optional
-        When loading private huggingface.co models, set `use_auth_token`
-        to True or to a string containing your hugginface.co authentication
-        token that can be obtained by running `huggingface-cli login`
-
-    Usage
+    embedding : PipelineModel
+        嵌入模型标识符，可以是：
+        - pyannote模型（如"pyannote/embedding"）
+        - SpeechBrain模型（如"speechbrain/spkrec-ecapa-voxceleb"）
+        - NeMo模型（如"nvidia/speakerverification_en_titanet_large"）
+        - WeSpeaker模型（如"hbredin/wespeaker-voxceleb-resnet34-LM"）
+        - 本地模型路径
+    device : torch.device, 可选
+        计算设备（CPU或GPU）
+    use_auth_token : str, 可选
+        当加载私有HuggingFace模型时，设置认证token
+        可以通过运行`huggingface-cli login`获取
+    
+    返回
+    -------
+    BaseInference
+        对应的预训练说话人嵌入模型实例
+    
+    使用示例
     -----
+    >>> # pyannote模型
     >>> get_embedding = PretrainedSpeakerEmbedding("pyannote/embedding")
+    >>> # SpeechBrain模型
     >>> get_embedding = PretrainedSpeakerEmbedding("speechbrain/spkrec-ecapa-voxceleb")
+    >>> # NeMo模型
     >>> get_embedding = PretrainedSpeakerEmbedding("nvidia/speakerverification_en_titanet_large")
+    >>> # 提取嵌入
     >>> assert waveforms.ndim == 3
     >>> batch_size, num_channels, num_samples = waveforms.shape
     >>> assert num_channels == 1
     >>> embeddings = get_embedding(waveforms)
     >>> assert embeddings.ndim == 2
     >>> assert embeddings.shape[0] == batch_size
-
+    >>> # 带掩码提取嵌入
     >>> assert masks.ndim == 1
     >>> assert masks.shape[0] == batch_size
     >>> embeddings = get_embedding(waveforms, masks=masks)
+    
+    自动选择逻辑
+    -----------
+    - 包含"pyannote" → PyannoteAudioPretrainedSpeakerEmbedding
+    - 包含"speechbrain" → SpeechBrainPretrainedSpeakerEmbedding
+    - 包含"nvidia" → NeMoPretrainedSpeakerEmbedding
+    - 包含"wespeaker" → ONNXWeSpeakerPretrainedSpeakerEmbedding
+    - 其他情况 → PyannoteAudioPretrainedSpeakerEmbedding（默认）
     """
 
+    # 根据模型名称自动选择合适的实现类
     if isinstance(embedding, str) and "pyannote" in embedding:
         return PyannoteAudioPretrainedSpeakerEmbedding(
             embedding, device=device, use_auth_token=use_auth_token
@@ -758,40 +841,56 @@ def PretrainedSpeakerEmbedding(
         return ONNXWeSpeakerPretrainedSpeakerEmbedding(embedding, device=device)
 
     else:
-        # fallback to pyannote in case we are loading a local model
+        # 默认回退到pyannote（用于加载本地模型）
         return PyannoteAudioPretrainedSpeakerEmbedding(
             embedding, device=device, use_auth_token=use_auth_token
         )
 
 
 class SpeakerEmbedding(Pipeline):
-    """Speaker embedding pipeline
-
-    This pipeline assumes that each file contains exactly one speaker
-    and extracts one single embedding from the whole file.
-
-    Parameters
+    """说话人嵌入管道
+    
+    从音频文件中提取说话人嵌入向量。
+    假设每个文件只包含一个说话人，从整个文件中提取单个嵌入向量。
+    
+    参数
     ----------
-    embedding : Model, str, or dict, optional
-        Pretrained embedding model. Defaults to "pyannote/embedding".
-        See pyannote.audio.pipelines.utils.get_model for supported format.
-    segmentation : Model, str, or dict, optional
-        Pretrained segmentation (or voice activity detection) model.
-        See pyannote.audio.pipelines.utils.get_model for supported format.
-        Defaults to no voice activity detection.
-    use_auth_token : str, optional
-        When loading private huggingface.co models, set `use_auth_token`
-        to True or to a string containing your hugginface.co authentication
-        token that can be obtained by running `huggingface-cli login`
-
-    Usage
+    embedding : Model, str, 或 dict, 默认"pyannote/embedding"
+        预训练嵌入模型
+        支持格式见 pyannote.audio.pipelines.utils.get_model
+    segmentation : Model, str, 或 dict, 可选
+        预训练分割模型（或语音活动检测模型）
+        用于加权提取嵌入（只关注语音活跃区域）
+        支持格式见 pyannote.audio.pipelines.utils.get_model
+        默认为None（不使用语音活动检测）
+    use_auth_token : str, 可选
+        当加载私有HuggingFace模型时，设置认证token
+        可以通过运行`huggingface-cli login`获取
+    
+    使用示例
     -----
     >>> from pyannote.audio.pipelines import SpeakerEmbedding
+    >>> # 创建管道
     >>> pipeline = SpeakerEmbedding()
+    >>> # 提取说话人嵌入
     >>> emb1 = pipeline("speaker1.wav")
     >>> emb2 = pipeline("speaker2.wav")
+    >>> # 计算说话人相似度（余弦距离）
     >>> from scipy.spatial.distance import cdist
     >>> distance = cdist(emb1, emb2, metric="cosine")[0,0]
+    
+    工作流程
+    --------
+    1. 加载音频文件
+    2. （可选）使用分割模型获取语音活动得分
+    3. 使用嵌入模型提取说话人嵌入
+    4. 如果提供了分割模型，使用语音活动得分加权聚合嵌入
+    
+    应用场景
+    --------
+    - 说话人验证（验证两个音频是否为同一说话人）
+    - 说话人识别（识别音频中的说话人）
+    - 说话人聚类（将多个音频按说话人分组）
     """
 
     def __init__(
@@ -821,21 +920,35 @@ class SpeakerEmbedding(Pipeline):
             )
 
     def apply(self, file: AudioFile) -> np.ndarray:
+        """应用管道处理音频文件
+        
+        参数
+        ----------
+        file : AudioFile
+            音频文件路径或对象
+        
+        返回
+        -------
+        np.ndarray
+            说话人嵌入向量（1维数组）
+        """
         device = self.embedding_model_.device
 
-        # read audio file and send it to GPU
+        # 读取音频文件并发送到GPU
         waveform = self.embedding_model_.audio(file)[0][None].to(device)
 
         if self.segmentation is None:
+            # 不使用语音活动检测，均匀加权
             weights = None
         else:
-            # obtain voice activity scores
+            # 获取语音活动得分
             weights = self._segmentation(file).data
-            # HACK -- this should be fixed upstream
+            # HACK -- 修复NaN值（应该在上游修复）
             weights[np.isnan(weights)] = 0.0
+            # 使用三次方增强语音区域的权重
             weights = torch.from_numpy(weights**3)[None, :, 0].to(device)
 
-        # extract speaker embedding on parts of
+        # 提取说话人嵌入（使用权重加权）
         with torch.no_grad():
             return self.embedding_model_(waveform, weights=weights).cpu().numpy()
 

@@ -44,10 +44,22 @@ from pyannote.audio.core.model import CACHE_DIR, Model
 from pyannote.audio.utils.reproducibility import fix_reproducibility
 from pyannote.audio.utils.version import check_version
 
+# 管道配置文件名（存储在HuggingFace Hub或本地）
 PIPELINE_PARAMS_NAME = "config.yaml"
 
 
 class Pipeline(_Pipeline):
+    """处理管道基类
+    
+    管道是将多个组件（模型、推理引擎等）组合成完整处理流程的框架。
+    继承自pyannote.pipeline.Pipeline，提供了：
+    - 预训练管道加载
+    - 组件管理（模型、推理引擎）
+    - 参数化配置
+    - 设备管理
+    - 批量处理支持
+    """
+    
     @classmethod
     def from_pretrained(
         cls,
@@ -56,20 +68,36 @@ class Pipeline(_Pipeline):
         use_auth_token: Union[Text, None] = None,
         cache_dir: Union[Path, Text] = CACHE_DIR,
     ) -> "Pipeline":
-        """Load pretrained pipeline
-
-        Parameters
+        """从预训练管道加载管道实例
+        
+        支持从以下位置加载：
+        1. 本地配置文件路径
+        2. HuggingFace Hub管道ID（例如："pyannote/speaker-diarization-3.1"）
+        3. HTTP/HTTPS URL
+        
+        参数
         ----------
-        checkpoint_path : Path or str
-            Path to pipeline checkpoint, or a remote URL,
-            or a pipeline identifier from the huggingface.co model hub.
-        hparams_file: Path or str, optional
-        use_auth_token : str, optional
-            When loading a private huggingface.co pipeline, set `use_auth_token`
-            to True or to a string containing your hugginface.co authentication
-            token that can be obtained by running `huggingface-cli login`
-        cache_dir: Path or str, optional
-            Path to model cache directory. Defauorch/pyannote" when unset.
+        checkpoint_path : Path 或 str
+            管道检查点路径、远程URL或HuggingFace Hub管道标识符
+            例如："pyannote/speaker-diarization-3.1"
+        hparams_file : Path 或 str, 可选
+            超参数文件路径（用于覆盖默认超参数）
+        use_auth_token : str, 可选
+            当加载私有HuggingFace管道时，设置认证token
+            可以通过运行`huggingface-cli login`获取
+        cache_dir : Path 或 str, 可选
+            模型缓存目录路径
+            默认使用CACHE_DIR（~/.cache/torch/pyannote）
+        
+        返回
+        -------
+        Pipeline
+            加载的管道实例
+        
+        示例
+        ------
+        >>> pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1")
+        >>> diarization = pipeline("audio.wav")
         """
 
         checkpoint_path = str(checkpoint_path)

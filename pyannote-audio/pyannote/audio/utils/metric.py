@@ -39,24 +39,43 @@ from pyannote.audio.utils.permutation import permutate
 
 
 def discrete_diarization_error_rate(reference: np.ndarray, hypothesis: np.ndarray):
-    """Discrete diarization error rate
-
-    Parameters
+    """计算离散化说话人分离错误率（DER）
+    
+    在帧级离散化的标注上计算DER。
+    首先使用排列不变性处理（匈牙利算法）找到最优说话人映射。
+    
+    参数
     ----------
     reference : (num_frames, num_speakers) np.ndarray
-        Discretized reference diarization.
-        reference[f, s] = 1 if sth speaker is active at frame f, 0 otherwise
+        离散化的参考标注
+        reference[f, s] = 1 表示第s个说话人在帧f活跃，否则为0
     hypothesis : (num_frames, num_speakers) np.ndarray
-        Discretized hypothesized diarization.
-       hypothesis[f, s] = 1 if sth speaker is active at frame f, 0 otherwise
-
-    Returns
+        离散化的假设标注
+        hypothesis[f, s] = 1 表示第s个说话人在帧f活跃，否则为0
+    
+    返回
     -------
     der : float
-        (false_alarm + missed_detection + confusion) / total
+        说话人分离错误率
+        公式：(false_alarm + missed_detection + confusion) / total
     components : dict
-        Diarization error rate components, in number of frames.
-        Keys are "false alarm", "missed detection", "confusion", and "total".
+        DER的组成部分（以帧数计算），包含：
+        - "false alarm": 误报（假设中有但参考中没有的语音）
+        - "missed detection": 漏检（参考中有但假设中没有的语音）
+        - "confusion": 混淆（说话人分配错误）
+        - "total": 总语音帧数
+    
+    算法
+    -----
+    1. 使用排列不变性处理找到最优说话人映射
+    2. 计算每帧的检测错误（误报和漏检）
+    3. 计算说话人混淆（分配错误）
+    4. 汇总所有错误并归一化
+    
+    注意
+    -----
+    - 假设和参考必须有相同的帧数
+    - 说话人数量可以不同（会自动对齐）
     """
 
     reference = reference.astype(np.half)
@@ -94,14 +113,36 @@ def discrete_diarization_error_rate(reference: np.ndarray, hypothesis: np.ndarra
 
 
 class DiscreteDiarizationErrorRate(BaseMetric):
-    """Compute diarization error rate on discretized annotations"""
+    """离散化说话人分离错误率指标
+    
+    在离散化的标注上计算DER。
+    支持多种输入格式：
+    - numpy数组（已离散化）
+    - SlidingWindowFeature（需要离散化）
+    - Annotation（需要离散化）
+    
+    指标组件
+    --------
+    - total: 总语音帧数
+    - false alarm: 误报帧数
+    - missed detection: 漏检帧数
+    - confusion: 混淆帧数
+    
+    使用场景
+    --------
+    - 模型训练时的验证指标
+    - 性能评估
+    - 超参数优化
+    """
 
     @classmethod
     def metric_name(cls):
+        """返回指标名称"""
         return "discrete diarization error rate"
 
     @classmethod
     def metric_components(cls):
+        """返回指标组件列表"""
         return ["total", "false alarm", "missed detection", "confusion"]
 
     def compute_components(
@@ -235,6 +276,18 @@ class DiscreteDiarizationErrorRate(BaseMetric):
             return components
 
     def compute_metric(self, components):
+        """计算最终的DER值
+        
+        参数
+        ----------
+        components : dict
+            包含DER各组件的字典
+        
+        返回
+        -------
+        float
+            DER值：(误报 + 漏检 + 混淆) / 总数
+        """
         return (
             components["false alarm"]
             + components["missed detection"]
@@ -243,16 +296,34 @@ class DiscreteDiarizationErrorRate(BaseMetric):
 
 
 class SlidingDiarizationErrorRate(BaseMetric):
+    """滑动窗口说话人分离错误率
+    
+    使用滑动窗口方法计算DER，在每个窗口内独立计算DER，然后聚合结果。
+    这种方法可以更好地处理长音频文件，并提供更细粒度的性能分析。
+    
+    参数
+    ----------
+    window : float, 默认10.0
+        滑动窗口的持续时间（秒）
+    
+    特点
+    -----
+    - 使用滑动窗口分段评估
+    - 窗口之间有重叠（步长为窗口的一半）
+    - 需要提供UEM（评估区域）
+    """
     def __init__(self, window: float = 10.0):
         super().__init__()
-        self.window = window
+        self.window = window  # 滑动窗口大小（秒）
 
     @classmethod
     def metric_name(cls):
+        """返回指标名称"""
         return "window diarization error rate"
 
     @classmethod
     def metric_components(cls):
+        """返回指标组件列表"""
         return ["total", "false alarm", "missed detection", "confusion"]
 
     def compute_components(
@@ -279,6 +350,18 @@ class SlidingDiarizationErrorRate(BaseMetric):
         return der[:]
 
     def compute_metric(self, components):
+        """计算最终的DER值
+        
+        参数
+        ----------
+        components : dict
+            包含DER各组件的字典
+        
+        返回
+        -------
+        float
+            DER值：(误报 + 漏检 + 混淆) / 总数
+        """
         return (
             components["false alarm"]
             + components["missed detection"]
@@ -287,19 +370,32 @@ class SlidingDiarizationErrorRate(BaseMetric):
 
 
 class MacroAverageFMeasure(BaseMetric):
-    """Compute macro-average F-measure
-
-    Parameters
+    """宏平均F-measure指标
+    
+    计算多个类别的宏平均F-measure（F-score）。
+    对每个类别分别计算F-measure，然后取平均。
+    
+    参数
     ----------
-    collar : float, optional
-        Duration (in seconds) of collars removed from evaluation around
-        boundaries of reference segments (one half before, one half after).
-    beta : float, optional
-        When beta > 1, greater importance is given to recall.
-        When beta < 1, greater importance is given to precision.
-        Defaults to 1.
-
-    See also
+    classes : List[str]
+        类别列表
+    collar : float, 默认0.0
+        边界容忍度（秒）
+        在参考段边界周围移除评估的collar区域
+        （边界前一半，边界后一半）
+    beta : float, 默认1.0
+        F-measure的beta参数
+        - beta > 1: 更重视召回率（recall）
+        - beta < 1: 更重视精确率（precision）
+        - beta = 1: 平衡精确率和召回率（F1-score）
+    
+    特点
+    -----
+    - 宏平均：对每个类别分别计算F-measure，然后取平均
+    - 适用于多类别检测任务
+    - 支持边界容忍度（collar）
+    
+    参考
     --------
     pyannote.metrics.detection.DetectionPrecisionRecallFMeasure
     """

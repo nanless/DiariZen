@@ -21,10 +21,13 @@
 # SOFTWARE.
 
 """
-# Audio IO
+音频I/O处理模块
 
-pyannote.audio relies on torchaudio for reading and resampling.
+本模块提供音频文件的读取、重采样、裁剪等功能。
+pyannote.audio依赖torchaudio进行音频读取和重采样操作。
 
+主要类：
+- Audio: 音频I/O处理类，提供统一的音频文件接口
 """
 
 import math
@@ -72,67 +75,113 @@ def get_torchaudio_info(file: AudioFile):
 
 
 class Audio:
-    """Audio IO
-
-    Parameters
+    """音频I/O处理类
+    
+    提供统一的音频文件读取、重采样、裁剪等功能。
+    支持多种输入格式：文件路径、文件对象、内存中的波形数据。
+    
+    参数
     ----------
-    sample_rate: int, optional
-        Target sampling rate. Defaults to using native sampling rate.
-    mono : {'random', 'downmix'}, optional
-        In case of multi-channel audio, convert to single-channel audio
-        using one of the following strategies: select one channel at
-        'random' or 'downmix' by averaging all channels.
-
-    Usage
+    sample_rate : int, 可选
+        目标采样率（Hz）
+        如果为None，使用音频文件的原始采样率
+        如果指定，会自动重采样到目标采样率
+    mono : {'random', 'downmix'}, 可选
+        多声道转单声道的策略：
+        - 'random': 随机选择一个声道
+        - 'downmix': 对所有声道求平均（推荐）
+        如果为None，保持原始声道数
+    
+    使用示例
     -----
+    >>> # 创建Audio对象，目标采样率16kHz，下混为单声道
     >>> audio = Audio(sample_rate=16000, mono='downmix')
+    >>> # 从文件读取音频
     >>> waveform, sample_rate = audio({"audio": "/path/to/audio.wav"})
     >>> assert sample_rate == 16000
+    >>> # 从内存中的波形数据读取
     >>> sample_rate = 44100
     >>> two_seconds_stereo = torch.rand(2, 2 * sample_rate)
     >>> waveform, sample_rate = audio({"waveform": two_seconds_stereo, "sample_rate": sample_rate})
     >>> assert sample_rate == 16000
-    >>> assert waveform.shape[0] == 1
+    >>> assert waveform.shape[0] == 1  # 单声道
     """
 
+    # 时间精度常量（秒），用于边界检查
     PRECISION = 0.001
 
     @staticmethod
     def power_normalize(waveform: Tensor) -> Tensor:
-        """Power-normalize waveform
-
-        Parameters
+        """功率归一化波形
+        
+        将波形归一化到单位功率（RMS=1），使不同音频的音量一致。
+        这对于模型训练和推理很重要，可以避免音量差异影响模型性能。
+        
+        参数
         ----------
         waveform : (..., time) Tensor
-            Waveform(s)
-
-        Returns
+            输入波形，最后一个维度是时间
+            可以是任意形状，例如：
+            - (time,): 单声道单样本
+            - (channel, time): 多声道单样本
+            - (batch, channel, time): 批次数据
+        
+        返回
         -------
-        waveform: (..., time) Tensor
-            Power-normalized waveform(s)
+        Tensor
+            功率归一化后的波形，形状与输入相同
+            RMS（均方根）值被归一化为1
+        
+        注意
+        -----
+        使用1e-8作为分母的小值，避免除零错误
         """
+        # 计算RMS（均方根）：sqrt(mean(square(waveform)))
         rms = waveform.square().mean(dim=-1, keepdim=True).sqrt()
+        # 归一化：waveform / RMS
         return waveform / (rms + 1e-8)
 
     @staticmethod
     def validate_file(file: AudioFile) -> Mapping:
-        """Validate file for use with the other Audio methods
-
-        Parameter
-        ---------
-        file: AudioFile
-
-        Returns
+        """验证和规范化音频文件输入
+        
+        将各种格式的音频输入转换为统一的字典格式，便于后续处理。
+        支持多种输入类型：
+        1. 文件路径（str或Path）
+        2. 文件对象（IOBase）
+        3. 字典（包含"audio"或"waveform"键）
+        4. 内存中的波形数据（包含"waveform"和"sample_rate"）
+        
+        参数
+        ----------
+        file : AudioFile
+            音频文件输入，可以是：
+            - str或Path: 文件路径
+            - IOBase: 文件对象
+            - Mapping: 字典，包含以下键之一：
+              - "audio": 文件路径或文件对象
+              - "waveform": numpy数组或torch.Tensor（形状：(channel, time)）
+                + "sample_rate": 采样率（必需）
+        
+        返回
         -------
-        validated_file : Mapping
-            {"audio": str, "uri": str, ...}
-            {"waveform": array or tensor, "sample_rate": int, "uri": str, ...}
-            {"audio": file, "uri": "stream"} if `file` is an IOBase instance
-
-        Raises
+        Mapping
+            规范化后的文件字典，包含：
+            - "audio": 文件路径或文件对象
+            - "uri": 文件标识符（文件名或"stream"）
+            或
+            - "waveform": 波形数据
+            - "sample_rate": 采样率
+            - "uri": 标识符
+        
+        异常
         ------
-        ValueError if file format is not valid or file does not exist.
-
+        ValueError
+            如果文件格式无效、文件不存在或缺少必需字段
+        
+        注意
+        -----
+        如果输入是IOBase实例，直接返回，不进行文件存在性检查
         """
 
         if isinstance(file, Mapping):
@@ -180,38 +229,62 @@ class Audio:
         return file
 
     def __init__(self, sample_rate=None, mono=None):
+        """初始化Audio对象
+        
+        参数
+        ----------
+        sample_rate : int, 可选
+            目标采样率（Hz），None表示使用原始采样率
+        mono : str, 可选
+            多声道转单声道策略："random"或"downmix"，None表示保持原始声道
+        """
         super().__init__()
-        self.sample_rate = sample_rate
-        self.mono = mono
+        self.sample_rate = sample_rate  # 目标采样率
+        self.mono = mono  # 单声道转换策略
 
     def downmix_and_resample(self, waveform: Tensor, sample_rate: int) -> Tensor:
-        """Downmix and resample
-
-        Parameters
+        """下混和重采样音频
+        
+        将多声道音频转换为单声道（如果指定），并重采样到目标采样率。
+        这是音频预处理的关键步骤，确保输入格式统一。
+        
+        参数
         ----------
         waveform : (channel, time) Tensor
-            Waveform.
+            输入波形，形状为(通道数, 时间样本数)
         sample_rate : int
-            Sample rate.
-
-        Returns
+            当前采样率（Hz）
+        
+        返回
         -------
         waveform : (channel, time) Tensor
-            Remixed and resampled waveform
+            处理后的波形
+            - 如果mono="downmix"或"random"：形状为(1, time)
+            - 如果mono=None：保持原始形状
         sample_rate : int
-            New sample rate
+            新的采样率（如果进行了重采样）
+        
+        处理流程
+        --------
+        1. 下混（如果多声道且mono不为None）：
+           - "random": 随机选择一个声道
+           - "downmix": 对所有声道求平均（推荐，保留更多信息）
+        2. 重采样（如果目标采样率与当前不同）：
+           - 使用torchaudio.functional.resample进行高质量重采样
         """
-
-        # downmix to mono
+        # ========== 下混到单声道 ==========
         num_channels = waveform.shape[0]
         if num_channels > 1:
             if self.mono == "random":
+                # 随机选择一个声道
                 channel = random.randint(0, num_channels - 1)
                 waveform = waveform[channel : channel + 1]
             elif self.mono == "downmix":
+                # 对所有声道求平均（推荐方法，保留更多信息）
                 waveform = waveform.mean(dim=0, keepdim=True)
 
-        # resample
+        # ========== 重采样 ==========
+        # 如果指定了目标采样率且与当前不同，进行重采样
         if (self.sample_rate is not None) and (self.sample_rate != sample_rate):
             waveform = torchaudio.functional.resample(
                 waveform, sample_rate, self.sample_rate
@@ -221,41 +294,76 @@ class Audio:
         return waveform, sample_rate
 
     def get_duration(self, file: AudioFile) -> float:
-        """Get audio file duration in seconds
-
-        Parameters
+        """获取音频文件时长（秒）
+        
+        计算音频文件的总时长，支持文件路径和内存中的波形数据。
+        
+        参数
         ----------
         file : AudioFile
-            Audio file.
-
-        Returns
+            音频文件输入（路径、文件对象或包含waveform的字典）
+        
+        返回
         -------
-        duration : float
-            Duration in seconds.
+        float
+            音频时长（秒）
+        
+        注意
+        -----
+        对于内存中的波形数据，直接计算长度
+        对于文件，使用torchaudio.info获取信息（可能使用缓存）
         """
-
         file = self.validate_file(file)
 
         if "waveform" in file:
-            frames = len(file["waveform"].T)
+            # 内存中的波形数据：直接计算长度
+            frames = len(file["waveform"].T)  # 转置后取时间维度长度
             sample_rate = file["sample_rate"]
-
         else:
+            # 文件：使用torchaudio.info获取信息
             if "torchaudio.info" in file:
+                # 使用缓存的信息（避免重复读取）
                 info = file["torchaudio.info"]
             else:
+                # 读取文件信息
                 info = get_torchaudio_info(file)
 
-            frames = info.num_frames
-            sample_rate = info.sample_rate
+            frames = info.num_frames  # 总帧数
+            sample_rate = info.sample_rate  # 采样率
 
+        # 时长 = 帧数 / 采样率
         return frames / sample_rate
 
     def get_num_samples(
         self, duration: float, sample_rate: Optional[int] = None
     ) -> int:
-        """Deterministic number of samples from duration and sample rate"""
-
+        """根据时长和采样率计算样本数
+        
+        这是一个确定性函数，给定时长和采样率，总是返回相同的样本数。
+        用于确保音频块大小的确定性。
+        
+        参数
+        ----------
+        duration : float
+            时长（秒）
+        sample_rate : int, 可选
+            采样率（Hz）
+            如果为None，使用self.sample_rate
+        
+        返回
+        -------
+        int
+            样本数（向下取整）
+        
+        异常
+        ------
+        ValueError
+            如果sample_rate为None且self.sample_rate也为None
+        
+        注意
+        -----
+        使用math.floor向下取整，确保不会超出实际长度
+        """
         sample_rate = sample_rate or self.sample_rate
 
         if sample_rate is None:
@@ -263,25 +371,46 @@ class Audio:
                 "`sample_rate` must be provided to compute number of samples."
             )
 
+        # 样本数 = 时长 × 采样率（向下取整）
         return math.floor(duration * sample_rate)
 
     def __call__(self, file: AudioFile) -> Tuple[Tensor, int]:
-        """Obtain waveform
-
-        Parameters
+        """读取音频文件并返回波形数据
+        
+        这是Audio类的主要接口，用于读取音频文件。
+        支持多种输入格式，自动处理重采样和下混。
+        
+        参数
         ----------
         file : AudioFile
-
-        Returns
+            音频文件输入，可以是：
+            - 文件路径（str或Path）
+            - 文件对象（IOBase）
+            - 字典（包含"audio"键）
+            - 字典（包含"waveform"和"sample_rate"键）
+        
+        返回
         -------
         waveform : (channel, time) torch.Tensor
-            Waveform
+            音频波形数据
+            - 形状：(通道数, 时间样本数)
+            - 如果mono="downmix"或"random"：形状为(1, time)
+            - 数据类型：torch.float32
         sample_rate : int
-            Sample rate
-
-        See also
+            采样率（Hz）
+            - 如果指定了self.sample_rate，返回目标采样率
+            - 否则返回原始采样率
+        
+        处理流程
         --------
-        AudioFile
+        1. 验证文件格式
+        2. 读取音频（从文件或内存）
+        3. 选择指定声道（如果指定了channel参数）
+        4. 下混和重采样（如果需要）
+        
+        参考
+        --------
+        AudioFile: 支持的输入格式
         """
 
         file = self.validate_file(file)
@@ -311,30 +440,49 @@ class Audio:
         duration: Optional[float] = None,
         mode="raise",
     ) -> Tuple[Tensor, int]:
-        """Fast version of self(file).crop(segment, **kwargs)
-
-        Parameters
+        """快速提取音频片段
+        
+        这是self(file).crop(segment, **kwargs)的优化版本，
+        直接使用torchaudio的seek-and-read功能，避免加载整个文件。
+        对于大文件和频繁裁剪操作，性能显著提升。
+        
+        参数
         ----------
         file : AudioFile
-            Audio file.
-        segment : `pyannote.core.Segment`
-            Temporal segment to load.
-        duration : float, optional
-            Overrides `Segment` 'focus' duration and ensures that the number of
-            returned frames is fixed (which might otherwise not be the case
-            because of rounding errors).
-        mode : {'raise', 'pad'}, optional
-            Specifies how out-of-bounds segments will behave.
-            * 'raise' -- raise an error (default)
-            * 'pad' -- zero pad
-
-        Returns
+            音频文件输入
+        segment : pyannote.core.Segment
+            要提取的时间段
+            包含start（起始时间）和end（结束时间），单位为秒
+        duration : float, 可选
+            覆盖Segment的持续时间，确保返回固定长度的帧数
+            用于避免舍入误差导致的长度不一致
+        mode : {'raise', 'pad'}, 默认'raise'
+            超出边界时的处理方式：
+            - 'raise': 抛出错误（默认，严格模式）
+            - 'pad': 用零填充（宽松模式，适用于边界情况）
+        
+        返回
         -------
         waveform : (channel, time) torch.Tensor
-            Waveform
+            提取的音频片段波形
         sample_rate : int
-            Sample rate
-
+            采样率
+        
+        异常
+        ------
+        ValueError
+            当mode='raise'且请求的片段超出文件范围时
+        
+        性能优化
+        --------
+        - 使用torchaudio的frame_offset和num_frames参数
+        - 避免加载整个文件到内存
+        - 对于文件对象，如果seek失败，回退到加载整个文件
+        
+        注意
+        -----
+        如果指定了duration，会确保返回的帧数固定，
+        即使segment.end - segment.start与duration略有不同
         """
         file = self.validate_file(file)
 

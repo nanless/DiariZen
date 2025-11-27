@@ -27,7 +27,11 @@
 # Hervé BREDIN - http://herve.niderb.fr
 
 """
-# Signal processing
+信号处理模块
+
+本模块提供音频信号处理相关的工具函数，主要包括：
+- 二值化（binarize）：将连续分数转换为二值标签
+- 滞后阈值（hysteresis thresholding）：减少抖动
 """
 
 from functools import singledispatch
@@ -48,27 +52,41 @@ def binarize(
     offset: Optional[float] = None,
     initial_state: Optional[Union[bool, np.ndarray]] = None,
 ):
-    """(Batch) hysteresis thresholding
-
-    Parameters
+    """批量滞后阈值二值化（Hysteresis Thresholding）
+    
+    将连续分数转换为二值标签，使用滞后阈值减少抖动。
+    滞后阈值使用两个阈值：
+    - onset（开启阈值）：分数超过此值时标记为活跃
+    - offset（关闭阈值）：分数低于此值时标记为非活跃
+    只有当分数超过onset时才开启，低于offset时才关闭，避免频繁切换。
+    
+    参数
     ----------
-    scores : numpy.ndarray or SlidingWindowFeature
-        (num_chunks, num_frames, num_classes)- or (num_frames, num_classes)-shaped scores.
-    onset : float, optional
-        Onset threshold. Defaults to 0.5.
-    offset : float, optional
-        Offset threshold. Defaults to `onset`.
-    initial_state : np.ndarray or bool, optional
-        Initial state.
-
-    Returns
+    scores : numpy.ndarray 或 SlidingWindowFeature
+        输入分数，形状为：
+        - (num_chunks, num_frames, num_classes)：批次数据
+        - (num_frames, num_classes)：单样本数据
+    onset : float, 默认0.5
+        开启阈值，分数超过此值时标记为活跃
+    offset : float, 可选
+        关闭阈值，分数低于此值时标记为非活跃
+        如果为None，默认等于onset
+    initial_state : np.ndarray 或 bool, 可选
+        初始状态
+        如果为None，根据第一个帧的分数自动推断
+    
+    返回
     -------
-    binarized : same as scores
-        Binarized scores with same shape and type as scores.
-
-    Reference
+    binarized : 与scores相同的类型和形状
+        二值化后的分数（布尔数组）
+    
+    参考
     ---------
     https://stackoverflow.com/questions/23289976/how-to-find-zero-crossings-with-hysteresis
+    
+    注意
+    -----
+    这是一个单分派泛型函数，根据输入类型自动选择对应的实现
     """
     raise NotImplementedError(
         "scores must be of type numpy.ndarray or SlidingWindowFeatures"
@@ -82,23 +100,34 @@ def binarize_ndarray(
     offset: Optional[float] = None,
     initial_state: Optional[Union[bool, np.ndarray]] = None,
 ):
-    """(Batch) hysteresis thresholding
-
-    Parameters
+    """numpy数组的滞后阈值二值化实现
+    
+    这是binarize函数针对numpy.ndarray类型的实现。
+    使用滞后阈值算法将连续分数转换为二值标签。
+    
+    参数
     ----------
     scores : numpy.ndarray
-        (num_frames, num_classes)-shaped scores.
-    onset : float, optional
-        Onset threshold. Defaults to 0.5.
-    offset : float, optional
-        Offset threshold. Defaults to `onset`.
-    initial_state : np.ndarray or bool, optional
-        Initial state.
-
-    Returns
+        输入分数，形状为(num_frames, num_classes)
+        注意：实际实现中支持批次维度(batch_size, num_frames, num_classes)
+    onset : float, 默认0.5
+        开启阈值
+    offset : float, 可选
+        关闭阈值，默认等于onset
+    initial_state : np.ndarray 或 bool, 可选
+        初始状态
+    
+    返回
     -------
-    binarized : same as scores
-        Binarized scores with same shape and type as scores.
+    binarized : numpy.ndarray
+        二值化后的分数，形状与输入相同，数据类型为bool
+    
+    算法说明
+    --------
+    1. 识别"定义良好"的帧（分数明确高于onset或低于offset）
+    2. 对于每个定义良好的帧，根据阈值决定状态
+    3. 对于未定义良好的帧，保持前一个定义良好帧的状态
+    4. 这样可以避免在阈值附近频繁切换
     """
 
     offset = offset or onset

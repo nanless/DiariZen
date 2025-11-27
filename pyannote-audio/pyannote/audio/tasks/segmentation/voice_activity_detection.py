@@ -33,54 +33,65 @@ from pyannote.audio.tasks.segmentation.mixins import SegmentationTask
 
 
 class VoiceActivityDetection(SegmentationTask):
-    """Voice activity detection
-
-    Voice activity detection (or VAD) is the task of detecting speech regions
-    in a given audio recording.
-
-    It is addressed as a binary (0 or 1) sequence labeling task. A frame is
-    marked as "speech" (1) as soon as at least one speaker is active.
-
-    Parameters
+    """语音活动检测（VAD）任务
+    
+    语音活动检测是从音频录音中检测语音区域的任务。
+    
+    任务定义
+    --------
+    这是一个二分类（0或1）序列标注任务。
+    当至少有一个说话人活跃时，帧被标记为"speech"（1）。
+    
+    特点
+    -----
+    - 二分类问题：speech（1）或non-speech（0）
+    - 帧级分辨率：每个时间帧都有标签
+    - 多说话人场景：只要有一个说话人活跃就标记为speech
+    
+    参数
     ----------
     protocol : Protocol
-        pyannote.database protocol
-    cache : str, optional
-        As (meta-)data preparation might take a very long time for large datasets,
-        it can be cached to disk for later (and faster!) re-use.
-        When `cache` does not exist, `Task.prepare_data()` generates training
-        and validation metadata from `protocol` and save them to disk.
-        When `cache` exists, `Task.prepare_data()` is skipped and (meta)-data
-        are loaded from disk. Defaults to a temporary path.
-    duration : float, optional
-        Chunks duration. Defaults to 2s.
-    warm_up : float or (float, float), optional
-        Use that many seconds on the left- and rightmost parts of each chunk
-        to warm up the model. While the model does process those left- and right-most
-        parts, only the remaining central part of each chunk is used for computing the
-        loss during training, and for aggregating scores during inference.
-        Defaults to 0. (i.e. no warm-up).
-    balance: Sequence[Text], optional
-        When provided, training samples are sampled uniformly with respect to these keys.
-        For instance, setting `balance` to ["database","subset"] will make sure that each
-        database & subset combination will be equally represented in the training samples.
-    weight: str, optional
-        When provided, use this key to as frame-wise weight in loss function.
-    batch_size : int, optional
-        Number of training samples per batch. Defaults to 32.
-    num_workers : int, optional
-        Number of workers used for generating training samples.
-        Defaults to multiprocessing.cpu_count() // 2.
-    pin_memory : bool, optional
-        If True, data loaders will copy tensors into CUDA pinned
-        memory before returning them. See pytorch documentation
-        for more details. Defaults to False.
-    augmentation : BaseWaveformTransform, optional
-        torch_audiomentations waveform transform, used by dataloader
-        during training.
-    metric : optional
-        Validation metric(s). Can be anything supported by torchmetrics.MetricCollection.
-        Defaults to AUROC (area under the ROC curve).
+        pyannote.database协议
+    cache : str, 可选
+        缓存路径。由于大型数据集的数据准备可能耗时很长，
+        可以缓存到磁盘以便后续（更快地）重用。
+        当`cache`不存在时，`Task.prepare_data()`从`protocol`生成训练和验证元数据并保存到磁盘。
+        当`cache`存在时，跳过`Task.prepare_data()`，从磁盘加载（元）数据。
+        默认为临时路径。
+    duration : float, 默认2.0
+        训练块（chunk）的持续时间（秒）
+    warm_up : float 或 (float, float), 默认0.0
+        在每个块的左右两端使用这么多秒来预热模型。
+        虽然模型会处理这些左右部分，但只有剩余的中心部分用于：
+        - 训练时计算损失
+        - 推理时聚合分数
+        默认0.0（即不预热）
+    balance : Sequence[Text], 可选
+        当提供时，训练样本相对于这些键均匀采样。
+        例如，设置`balance`为["database","subset"]将确保每个数据库和子集组合
+        在训练样本中均匀表示。
+    weight : str, 可选
+        当提供时，使用此键作为损失函数中的帧级权重。
+        例如，可以使用模型置信度作为权重。
+    batch_size : int, 默认32
+        每个批次的训练样本数
+    num_workers : int, 可选
+        用于生成训练样本的工作进程数
+        默认为 multiprocessing.cpu_count() // 2
+    pin_memory : bool, 默认False
+        如果为True，数据加载器将在返回张量之前将它们复制到CUDA固定内存。
+        详见PyTorch文档
+    augmentation : BaseWaveformTransform, 可选
+        torch_audiomentations波形变换，训练时由数据加载器使用
+    metric : Metric, Sequence[Metric], 或 Dict[str, Metric], 可选
+        验证指标。可以是torchmetrics.MetricCollection支持的任何指标。
+        默认为AUROC（ROC曲线下面积）
+    
+    任务规范
+    --------
+    - problem: BINARY_CLASSIFICATION（二分类）
+    - resolution: FRAME（帧级）
+    - classes: ["speech"]（单一类别：语音）
     """
 
     def __init__(
@@ -124,26 +135,38 @@ class VoiceActivityDetection(SegmentationTask):
         )
 
     def prepare_chunk(self, file_id: int, start_time: float, duration: float):
-        """Prepare chunk for voice activity detection
-
-        Parameters
+        """准备语音活动检测的训练块
+        
+        从文件中提取指定时间段的音频块，并生成对应的VAD标签。
+        
+        参数
         ----------
         file_id : int
-            File index
+            文件索引
         start_time : float
-            Chunk start time
+            块的开始时间（秒）
         duration : float
-            Chunk duration.
-
-        Returns
+            块的持续时间（秒）
+        
+        返回
         -------
         sample : dict
-            Dictionary containing the chunk data with the following keys:
-            - `X`: waveform
-            - `y`: target as a SlidingWindowFeature instance
-            - `meta`:
-                - `database`: database index
-                - `file`: file index
+            包含块数据的字典，包含以下键：
+            - `X`: 波形数据（torch.Tensor）
+            - `y`: 目标标签（SlidingWindowFeature实例）
+              形状为(num_frames, 1)，值为0（非语音）或1（语音）
+            - `meta`: 元数据字典
+                - `database`: 数据库索引
+                - `file`: 文件索引
+                - 其他元数据字段
+        
+        处理流程
+        --------
+        1. 从文件中提取指定时间段的音频波形
+        2. 获取该时间段内的所有标注
+        3. 将标注离散化为帧级标签
+        4. 构建SlidingWindowFeature目标
+        5. 返回样本字典
         """
 
         file = self.get_file(file_id)
