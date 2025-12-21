@@ -41,8 +41,10 @@ class DiariZenPipeline(SpeakerDiarizationPipeline):
 
         if config_parse is not None:
             print('Overriding with parsed config.')
-            config["inference"]["args"] = config_parse["inference"]["args"]
-            config["clustering"]["args"] = config_parse["clustering"]["args"]
+            if "inference" in config_parse and "args" in config_parse["inference"]:
+                config["inference"]["args"].update(config_parse["inference"]["args"])
+            if "clustering" in config_parse and "args" in config_parse["clustering"]:
+                config["clustering"]["args"].update(config_parse["clustering"]["args"])
        
         inference_config = config["inference"]["args"]
         clustering_config = config["clustering"]["args"]
@@ -63,6 +65,13 @@ class DiariZenPipeline(SpeakerDiarizationPipeline):
             "config": config
         }
         
+        # 处理整句推理逻辑：如果 seg_duration 特别大，记录该模式
+        self.full_utterance_mode = False
+        seg_duration = inference_config["seg_duration"]
+        if seg_duration > 10000:
+            print(f"检测到整句推理请求")
+            self.full_utterance_mode = True
+
         super().__init__(
             segmentation=segmentation_model_dict,
             segmentation_step=inference_config["segmentation_step"],
@@ -72,6 +81,9 @@ class DiariZenPipeline(SpeakerDiarizationPipeline):
             embedding_batch_size=inference_config["batch_size"],
             segmentation_batch_size=inference_config["batch_size"],
         )
+
+        # 针对整句推理，如果设置了极大的 seg_duration，我们覆盖 sliding_window
+        # 移除之前的错误实现
         
         # 在初始化后设置设备
         self.device = device
@@ -154,7 +166,16 @@ class DiariZenPipeline(SpeakerDiarizationPipeline):
         self.binarize_min_duration_on = binarize_min_duration_on
         self.binarize_min_duration_off = binarize_min_duration_off
 
-        assert self._segmentation.model.specifications.powerset is True
+        # 根据模型规格自动处理，不再强制要求 powerset
+        self.is_powerset = self._segmentation.model.specifications.powerset
+
+        # 修复 Multilabel 模式下 Identity 转换层不支持 soft 参数的问题
+        if not self.is_powerset:
+            from torch import nn
+            class IdentityWithSoft(nn.Module):
+                def forward(self, x, soft=False):
+                    return x
+            self._segmentation.conversion = IdentityWithSoft().to(device)
 
     @classmethod
     def from_pretrained(
@@ -168,6 +189,7 @@ class DiariZenPipeline(SpeakerDiarizationPipeline):
         binarize_offset: Optional[float] = None,
         binarize_min_duration_on: float = 0.0,
         binarize_min_duration_off: float = 0.0,
+        config_parse: Optional[Dict[str, Any]] = None,
     ) -> "DiariZenPipeline":
         # 检查是否是本地路径
         local_path = Path(repo_id)
@@ -188,6 +210,7 @@ class DiariZenPipeline(SpeakerDiarizationPipeline):
         return cls(
             diarizen_hub=Path(diarizen_hub).expanduser().absolute(),
             embedding_model=embedding_model,
+            config_parse=config_parse,
             rttm_out_dir=rttm_out_dir,
             device=device,
             segmentation_only=segmentation_only,
@@ -206,6 +229,12 @@ class DiariZenPipeline(SpeakerDiarizationPipeline):
         waveform = torch.unsqueeze(waveform[0], 0)      # force to use the SDM data
         # 确保输入数据在正确的设备上
         waveform = waveform.to(self.device)
+
+        # 如果是整句模式，动态设置 duration 为当前音频长度，避免产生巨大的 Padding
+        if hasattr(self, "full_utterance_mode") and self.full_utterance_mode:
+            duration = waveform.shape[-1] / sample_rate
+            self._segmentation.duration = duration
+            self._segmentation.step = duration
         
         # CPU 优化：使用 torch.inference_mode() 来加速推理（禁用梯度计算和自动微分）
         # inference_mode 比 no_grad 更快，因为它完全禁用了自动微分图构建
@@ -227,22 +256,28 @@ class DiariZenPipeline(SpeakerDiarizationPipeline):
 
         if self.segmentation_only:
             # 只使用 segmentation，跳过 embedding 和 clustering
-            # 将 powerset segmentation 转换为 multi-label
-            print("Converting powerset to multilabel (segmentation-only mode).")
             
-            # 获取 conversion 对象（Powerset 转换器）
-            conversion = self._segmentation.conversion
-            
-            # 将 powerset segmentation 转换为 multi-label
-            # segmentations.data 形状: (num_chunks, num_frames, num_powerset_classes)
-            num_chunks, num_frames, num_powerset_classes = segmentations.data.shape
-            
-            # 转换为 torch tensor 并移动到正确设备
-            powerset_tensor = torch.from_numpy(segmentations.data).to(self.device)
-            
-            # 转换为 multi-label: (num_chunks, num_frames, num_speakers)
-            multilabel_tensor = conversion.to_multilabel(powerset_tensor, soft=False)
-            multilabel_data = multilabel_tensor.cpu().numpy()
+            if self.is_powerset:
+                # 将 powerset segmentation 转换为 multi-label
+                print("Converting powerset to multilabel (segmentation-only mode).")
+                
+                # 获取 conversion 对象（Powerset 转换器）
+                conversion = self._segmentation.conversion
+                
+                # 将 powerset segmentation 转换为 multi-label
+                # segmentations.data 形状: (num_chunks, num_frames, num_powerset_classes)
+                num_chunks, num_frames, num_powerset_classes = segmentations.data.shape
+                
+                # 转换为 torch tensor 并移动到正确设备
+                powerset_tensor = torch.from_numpy(segmentations.data).to(self.device)
+                
+                # 转换为 multi-label: (num_chunks, num_frames, num_speakers)
+                multilabel_tensor = conversion.to_multilabel(powerset_tensor, soft=False)
+                multilabel_data = multilabel_tensor.cpu().numpy()
+            else:
+                # 已经是 multi-label，直接使用
+                print("Using native multilabel output (segmentation-only mode).")
+                multilabel_data = segmentations.data
             
             # 创建 multi-label segmentation
             from pyannote.core import SlidingWindowFeature

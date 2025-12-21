@@ -21,9 +21,11 @@ class Trainer(BaseTrainer):
         # auto GN
         self.grad_history = []
 
-    def compute_grad_norm(self, model):
+    def compute_grad_norm(self, model, params=None):
         total_norm = 0
-        for p in model.parameters():
+        if params is None:
+            params = model.parameters()
+        for p in params:
             if p.grad is not None:
                 param_norm = p.grad.data.norm(2)
                 total_norm += param_norm.item() ** 2
@@ -43,7 +45,19 @@ class Trainer(BaseTrainer):
         self.optimizer_big.zero_grad()
 
         xs, target = batch['xs'], batch['ts'] 
+        frame_mask = batch.get('mask', None)
+        if frame_mask is not None:
+            frame_mask = frame_mask.to(xs.device).unsqueeze(-1)  # (B, T, 1)
+
         y_pred = self.model(xs)
+        # align sequence lengths between prediction and target
+        min_len = min(y_pred.size(1), target.size(1))
+        if y_pred.size(1) != min_len:
+            y_pred = y_pred[:, :min_len, :].contiguous()
+        if target.size(1) != min_len:
+            target = target[:, :min_len, :]
+            if frame_mask is not None:
+                frame_mask = frame_mask[:, :min_len, :]
         # powerset
         multilabel = self.unwrap_model.powerset.to_multilabel(y_pred)
         permutated_target, _ = permutate(multilabel, target)
@@ -53,7 +67,8 @@ class Trainer(BaseTrainer):
        
         loss = nll_loss(
             y_pred,
-            torch.argmax(permutated_target_powerset, dim=-1)
+            torch.argmax(permutated_target_powerset, dim=-1),
+            weight=frame_mask
         )
         
         # skip batch if something went wrong for some reason
@@ -62,20 +77,44 @@ class Trainer(BaseTrainer):
         
         self.accelerator.backward(loss)
 
+        grad_norm_small = None
+        grad_norm_big = None
         if self.accelerator.sync_gradients:
             # The gradients are added across all processes in this cumulative gradient accumulation step.
+            grad_norm_small = self.compute_grad_norm(
+                self.model, self.optimizer_small.param_groups[0]["params"]
+            )
+            grad_norm_big = self.compute_grad_norm(
+                self.model, self.optimizer_big.param_groups[0]["params"]
+            )
             self.auto_clip_grad_norm_(self.model)
                                
         self.optimizer_small.step()
         self.optimizer_big.step()
         
-        return {"Loss": loss}
+        return {
+            "Loss": loss.detach(),
+            "grad_norm_small": grad_norm_small,
+            "grad_norm_big": grad_norm_big,
+            "lr_small": self.optimizer_small.param_groups[0]["lr"],
+            "lr_big": self.optimizer_big.param_groups[0]["lr"],
+        }
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         xs, target = batch['xs'], batch['ts'] 
+        frame_mask = batch.get('mask', None)
+        if frame_mask is not None:
+            frame_mask = frame_mask.to(xs.device).unsqueeze(-1)  # (B, T, 1)
         sil_all_target = torch.zeros_like(target)
 
         y_pred = self.model(xs)
+        min_len = min(y_pred.size(1), target.size(1))
+        if y_pred.size(1) != min_len:
+            y_pred = y_pred[:, :min_len, :].contiguous()
+        if target.size(1) != min_len:
+            target = target[:, :min_len, :]
+            if frame_mask is not None:
+                frame_mask = frame_mask[:, :min_len, :]
         # powerset
         multilabel = self.unwrap_model.powerset.to_multilabel(y_pred)
         permutated_target, _ = permutate(multilabel, target)
@@ -84,12 +123,20 @@ class Trainer(BaseTrainer):
         )
 
         loss = nll_loss(y_pred,
-            torch.argmax(permutated_target_powerset, dim=-1)
+            torch.argmax(permutated_target_powerset, dim=-1),
+            weight=frame_mask
         )
-        val_metrics = self.unwrap_model.validation_metric(
-            torch.transpose(multilabel, 1, 2),
-            torch.transpose(target, 1, 2),
-        )
+        if frame_mask is not None:
+            mask_metric = frame_mask.transpose(1, 2)  # (B, 1, T)
+            val_metrics = self.unwrap_model.validation_metric(
+                torch.transpose(multilabel, 1, 2) * mask_metric,
+                torch.transpose(target, 1, 2) * mask_metric,
+            )
+        else:
+            val_metrics = self.unwrap_model.validation_metric(
+                torch.transpose(multilabel, 1, 2),
+                torch.transpose(target, 1, 2),
+            )
 
         if not torch.equal(target, sil_all_target):
             val_DER = val_metrics['DiarizationErrorRate']

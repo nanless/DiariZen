@@ -7,7 +7,7 @@ import numpy as np
 from accelerate.logging import get_logger
 
 from pyannote.audio.utils.permutation import permutate
-from pyannote.audio.utils.loss import nll_loss
+from pyannote.audio.utils.loss import binary_cross_entropy
 
 from diarizen.trainer_single_opt import Trainer as BaseTrainer
 
@@ -56,16 +56,15 @@ class Trainer(BaseTrainer):
             target = target[:, :min_len, :]
             if frame_mask is not None:
                 frame_mask = frame_mask[:, :min_len, :]
-        # powerset
-        multilabel = self.unwrap_model.powerset.to_multilabel(y_pred)
-        permutated_target, _ = permutate(multilabel, target)
-        permutated_target_powerset = self.unwrap_model.powerset.to_powerset(
-            permutated_target.float()
-        )
+        
+        # 使用原生 multilabel，不需要 powerset 转换
+        # y_pred 已经是 sigmoid 输出，形状为 (B, T, num_speakers)
+        # target 形状为 (B, T, num_speakers)
+        permutated_target, _ = permutate(y_pred, target)
        
-        loss = nll_loss(
+        loss = binary_cross_entropy(
             y_pred,
-            torch.argmax(permutated_target_powerset, dim=-1),
+            permutated_target,
             weight=frame_mask
         )
         
@@ -105,30 +104,31 @@ class Trainer(BaseTrainer):
             target = target[:, :min_len, :]
             if frame_mask is not None:
                 frame_mask = frame_mask[:, :min_len, :]
-        # powerset
-        multilabel = self.unwrap_model.powerset.to_multilabel(y_pred)
-        permutated_target, _ = permutate(multilabel, target)
-        permutated_target_powerset = self.unwrap_model.powerset.to_powerset(
-            permutated_target.float()
-        )
+        
+        # 使用原生 multilabel，不需要 powerset 转换
+        permutated_target, _ = permutate(y_pred, target)
 
-        loss = nll_loss(y_pred,
-            torch.argmax(permutated_target_powerset, dim=-1),
+        loss = binary_cross_entropy(
+            y_pred,
+            permutated_target,
             weight=frame_mask
         )
+        
+        # 使用排列对齐后的目标计算指标
         if frame_mask is not None:
             mask_metric = frame_mask.transpose(1, 2)  # (B, 1, T)
             val_metrics = self.unwrap_model.validation_metric(
-                torch.transpose(multilabel, 1, 2) * mask_metric,
-                torch.transpose(target, 1, 2) * mask_metric,
+                torch.transpose(y_pred, 1, 2) * mask_metric,
+                torch.transpose(permutated_target, 1, 2) * mask_metric,
             )
         else:
             val_metrics = self.unwrap_model.validation_metric(
-                torch.transpose(multilabel, 1, 2),
-                torch.transpose(target, 1, 2),
+                torch.transpose(y_pred, 1, 2),
+                torch.transpose(permutated_target, 1, 2),
             )
 
-        if not torch.equal(target, sil_all_target):
+        # 检查是否有语音（使用排列对齐后的目标）
+        if not torch.equal(permutated_target, sil_all_target):
             val_DER = val_metrics['DiarizationErrorRate']
             val_FA = val_metrics['DiarizationErrorRate/FalseAlarm']
             val_Miss = val_metrics['DiarizationErrorRate/Miss']
@@ -159,8 +159,6 @@ class Trainer(BaseTrainer):
 
     def train(self, train_dataloader, validation_dataloader):
         """Override train method to add progress bar updates with loss, grad_norm, and lr."""
-        # Call parent train method but we need to override the training loop
-        # So we'll copy the logic and add progress bar updates
         from torch.utils.data import DataLoader
         from tqdm.auto import tqdm
         
@@ -289,3 +287,4 @@ class Trainer(BaseTrainer):
             
             if reduced_early_stop_mark != 0:
                 break
+

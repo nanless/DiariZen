@@ -17,7 +17,7 @@ from diarizen.ckpt_utils import average_ckpt
 from dataset import _collate_fn
 from functools import partial
 
-def run(config, resume):
+def run(config, resume, mode):
     init_logging_logger(config)
 
     ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
@@ -28,12 +28,18 @@ def run(config, resume):
 
     set_seed(config["meta"]["seed"], device_specific=True)
 
-    model = instantiate(config["model"]["path"], args=config["model"]["args"])
+    # 确保 use_powerset 参数存在，默认为 True（powerset 模式）
+    model_args = config["model"]["args"].copy()
+    if "use_powerset" not in model_args:
+        model_args["use_powerset"] = True
+    
+    model = instantiate(config["model"]["path"], args=model_args)
     model_num_frames, model_rf_duration, model_rf_step = model.get_rf_info
 
     if config["finetune"]["finetune"]:
         accelerator.print('fine-tuning...')
-        model = average_ckpt(config["finetune"]["ckpt_dir"], model, avg_ckpt_num=config["finetune"]["avg_ckpt_num"])
+        avg_ckpt_num = config["finetune"].get("avg_ckpt_num", 1)
+        model = average_ckpt(config["finetune"]["ckpt_dir"], model, avg_ckpt_num=avg_ckpt_num)
 
     optimizer = instantiate(
         config["optimizer"]["path"],
@@ -60,14 +66,14 @@ def run(config, resume):
         max_speakers_per_chunk=config["model"]["args"]["max_speakers_per_chunk"]
     )
 
-    if "train" in args.mode:
+    if "train" in mode:
         train_dataset = instantiate(config["train_dataset"]["path"], args=train_dataset_config)
         train_dataloader = DataLoader(
             dataset=train_dataset, collate_fn=collate_fn_partial, shuffle=True, **config["train_dataset"]["dataloader"]
         )
         train_dataloader = accelerator.prepare(train_dataloader)
 
-    if "train" in args.mode or "validate" in args.mode:
+    if "train" in mode or "validate" in mode:
         validate_dataset = instantiate(config["validate_dataset"]["path"], args=validate_dataset_config)
         validate_dataloader = DataLoader(
             dataset=validate_dataset, collate_fn=collate_fn_partial, shuffle=False, **config["validate_dataset"]["dataloader"]
@@ -82,7 +88,7 @@ def run(config, resume):
         optimizer=optimizer
     )
 
-    for flag in args.mode:
+    for flag in mode:
         if flag == "train":
             trainer.train(train_dataloader, validate_dataloader)
         elif flag == "validate":
@@ -135,4 +141,4 @@ if __name__ == "__main__":
     config["meta"]["exp_id"] = config_path.stem
     config["meta"]["config_path"] = config_path.as_posix()
 
-    run(config, args.resume)
+    run(config, args.resume, args.mode)

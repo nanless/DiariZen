@@ -30,7 +30,7 @@ lr = 1e-3
 path = "diarizen.models.eend.model_fbank_conformer.Model"
 [model.args]
 n_fft = 400
-n_mels = 80
+n_mels = 128
 win_length = 25 # ms
 hop_length = 10 # ms
 sample_rate = 16000

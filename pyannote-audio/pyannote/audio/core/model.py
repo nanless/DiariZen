@@ -207,6 +207,7 @@ class Model(nn.Module):
         task: Optional[Task] = None,
         max_speakers_per_chunk: int = 4,
         max_speakers_per_frame: int = 2,
+        use_powerset: bool = True,
         duration: int = 5,
         min_duration: int = 5,
         warm_up: Union[float, Tuple[float, float]] = 0.0,
@@ -227,6 +228,10 @@ class Model(nn.Module):
             每个音频块的最大说话人数（用于定义类别数）
         max_speakers_per_frame : int, 默认2
             每帧的最大同时说话人数（用于幂集编码）
+        use_powerset : bool, 默认True
+            是否使用幂集编码模式
+            - True: 使用 powerset 模式（MONO_LABEL_CLASSIFICATION）
+            - False: 使用 multilabel 模式（MULTI_LABEL_CLASSIFICATION）
         duration : int, 默认5
             音频块持续时间（秒）
         min_duration : int, 默认5
@@ -250,17 +255,24 @@ class Model(nn.Module):
         self.audio = Audio(sample_rate=sample_rate, mono=mono)
 
         # 定义任务规格（Specifications）
-        # 根据max_speakers_per_frame决定是多标签还是单标签分类
+        # 根据use_powerset决定是多标签还是单标签分类
+        if use_powerset:
+            # powerset 模式：使用单标签分类，需要 max_speakers_per_frame
+            problem = Problem.MONO_LABEL_CLASSIFICATION
+            powerset_max_classes = max_speakers_per_frame
+        else:
+            # multilabel 模式：使用多标签分类，不需要 powerset
+            problem = Problem.MULTI_LABEL_CLASSIFICATION
+            powerset_max_classes = None
+        
         self.specifications = Specifications(
-            problem=Problem.MULTI_LABEL_CLASSIFICATION
-            if max_speakers_per_frame is None
-            else Problem.MONO_LABEL_CLASSIFICATION,
+            problem=problem,
             resolution=Resolution.FRAME,  # 帧级输出
             duration=duration,  # 块持续时间
             min_duration=min_duration,  # 最小持续时间
             warm_up=warm_up,  # 预热时间
             classes=[f"speaker#{i+1}" for i in range(max_speakers_per_chunk)],  # 说话人类别
-            powerset_max_classes=max_speakers_per_frame,  # 幂集最大类别数
+            powerset_max_classes=powerset_max_classes,  # 幂集最大类别数（powerset 模式时有效）
             permutation_invariant=True,  # 排列不变性（说话人顺序无关）
         )
 

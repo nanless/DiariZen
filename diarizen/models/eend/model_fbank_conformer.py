@@ -32,6 +32,8 @@ class Model(BaseModel):
         use_posi: bool = False,
         output_activate_function: str = False,
         max_speakers_per_chunk: int = 4,
+        max_speakers_per_frame: int = 2,
+        use_powerset: bool = True,
         chunk_size: int = 5,
         num_channels: int = 8,
         selected_channel: int = 0,
@@ -39,7 +41,9 @@ class Model(BaseModel):
         super().__init__(
             num_channels=num_channels,
             duration=chunk_size,
-            max_speakers_per_chunk=max_speakers_per_chunk
+            max_speakers_per_chunk=max_speakers_per_chunk,
+            max_speakers_per_frame=max_speakers_per_frame,
+            use_powerset=use_powerset
         )
         
         self.chunk_size = chunk_size

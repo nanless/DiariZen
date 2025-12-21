@@ -8,6 +8,10 @@ from typing import List
 
 import torch
 import torchaudio
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 from diarizen.pipelines.inference import DiariZenPipeline
 
 # CPU 优化设置（全局标志，确保只设置一次）
@@ -174,6 +178,12 @@ def main():
         default=0.0,
         help="Binarize最小静音持续时间（秒，默认: 0.0）"
     )
+    parser.add_argument(
+        "--plot",
+        action="store_true",
+        default=False,
+        help="为每个样本生成可视化 PNG（默认关闭）"
+    )
     
     args = parser.parse_args()
     
@@ -272,6 +282,69 @@ def main():
                 is_multispeaker = bool(num_speakers and num_speakers > 1)
                 # 与 pipeline 写入的 RTTM 名称保持一致：<session_name>.rttm
                 rttm_path = os.path.join(out_dir, f"{session_name}.rttm")
+                plot_path = None
+
+                if args.plot:
+                    plot_path = os.path.join(out_dir, f"{session_name}.png")
+                    try:
+                        waveform, sr = torchaudio.load(audio_path)
+                        if waveform.dim() > 1:
+                            waveform = waveform.mean(dim=0, keepdim=True)
+                        t = torch.linspace(0, waveform.shape[-1] / sr, steps=waveform.shape[-1])
+
+                        speakers = sorted(set(label for _, _, label in diar.itertracks(yield_label=True)))
+                        colors = plt.cm.get_cmap("tab20", max(len(speakers), 1))
+                        spk_color = {spk: colors(i) for i, spk in enumerate(speakers)}
+                        spk_pos = {spk: idx for idx, spk in enumerate(speakers)}
+
+                        fig, (ax_wave, ax_diar) = plt.subplots(
+                            2,
+                            1,
+                            sharex=True,
+                            figsize=(12, 4),
+                            gridspec_kw={"height_ratios": [1.4, 1]},
+                        )
+
+                        # 波形参考
+                        ax_wave.plot(t, waveform[0].numpy(), color="gray", alpha=0.6, linewidth=0.5)
+                        ax_wave.set_ylabel("Amplitude")
+                        ax_wave.set_title(session_name)
+                        ax_wave.set_xlim(0, duration if duration > 0 else None)
+
+                        # 按说话人分行绘制区间
+                        if speakers:
+                            for segment, _, spk in diar.itertracks(yield_label=True):
+                                y = spk_pos[spk]
+                                ax_diar.broken_barh(
+                                    [(segment.start, segment.end - segment.start)],
+                                    (y - 0.4, 0.8),
+                                    facecolors=spk_color.get(spk, "C0"),
+                                    alpha=0.8,
+                                )
+                            ax_diar.set_yticks(list(spk_pos.values()))
+                            ax_diar.set_yticklabels(list(spk_pos.keys()))
+                            ax_diar.set_ylim(-0.5, len(speakers) - 0.5)
+                        else:
+                            ax_diar.text(
+                                0.5,
+                                0.5,
+                                "no speech",
+                                ha="center",
+                                va="center",
+                                transform=ax_diar.transAxes,
+                            )
+                            ax_diar.set_ylim(-0.5, 0.5)
+
+                        ax_diar.set_xlabel("Time (s)")
+                        ax_diar.set_ylabel("Speaker")
+                        ax_diar.grid(True, axis="x", linestyle="--", alpha=0.3)
+
+                        fig.tight_layout()
+                        fig.savefig(plot_path, dpi=150)
+                        plt.close(fig)
+                    except Exception as e_plot:
+                        print(f"绘图失败 {audio_path}: {e_plot}")
+                        plot_path = None
 
                 summary.append({
                     "wav_path": os.path.abspath(audio_path),
@@ -282,9 +355,11 @@ def main():
                     "duration_sec": duration,
                     "elapsed_sec": elapsed,
                     "rtf": rtf,
+                    "plot_path": plot_path,
                 })
                 rtf_str = f"{rtf:.3f}" if rtf is not None else "NA"
-                print(f"{audio_path}\t说话人数量={num_speakers}\t多说话人={is_multispeaker}\tRTF={rtf_str}\tRTTM={rttm_path}")
+                extra_plot = f"\tPNG={plot_path}" if plot_path else ""
+                print(f"{audio_path}\t说话人数量={num_speakers}\t多说话人={is_multispeaker}\tRTF={rtf_str}\tRTTM={rttm_path}{extra_plot}")
             except Exception as e_inner:
                 # 特判：模型内部报错 "negative dimensions are not allowed" 视为 0 说话人
                 msg = str(e_inner).lower()
@@ -310,6 +385,7 @@ def main():
                         "duration_sec": duration,
                         "elapsed_sec": elapsed,
                         "rtf": rtf,
+                        "plot_path": None,
                     })
                     rtf_str = f"{rtf:.3f}" if rtf is not None else "NA"
                     print(f"{audio_path}\t说话人数量=0\t多说话人=False\tRTF={rtf_str}\tRTTM={rttm_path}\t(异常推断)")

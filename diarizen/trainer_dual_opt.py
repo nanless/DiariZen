@@ -480,6 +480,25 @@ class Trainer:
                             self.lr_one_cycle_scheduler_small.step() 
                             self.lr_one_cycle_scheduler_big.step() 
 
+                if self.accelerator.is_local_main_process and loss_dict is not None:
+                    loss_val = loss_dict.get("Loss", None)
+                    gns = loss_dict.get("grad_norm_small", None)
+                    gnb = loss_dict.get("grad_norm_big", None)
+                    lrs = loss_dict.get("lr_small", None)
+                    lrb = loss_dict.get("lr_big", None)
+                    desc_parts = []
+                    if loss_val is not None:
+                        try:
+                            desc_parts.append(f"loss {float(loss_val):.4f}")
+                        except Exception:
+                            pass
+                    if gns is not None and gnb is not None:
+                        desc_parts.append(f"gn {gns:.1f}/{gnb:.1f}")
+                    if lrs is not None and lrb is not None:
+                        desc_parts.append(f"lr {lrs:.2e}/{lrb:.2e}")
+                    if desc_parts:
+                        dataloader_bar.set_description(" | ".join(desc_parts))
+
                 self.state.steps_trained += 1
             self.state.epochs_trained += 1
             self.training_epoch_end(training_epoch_output)
