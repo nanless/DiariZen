@@ -7,12 +7,12 @@ set -eo pipefail
 
 # 基础路径配置
 REPO_DIR="$(cd -- "$(dirname "$0")" && pwd)"
-EXP_NAME="kaldi_merged_1205_1207_fbank_conformer"
+EXP_NAME="kaldi_merged_1205_1207_fbank_conformer_finetune"
 EXP_DIR="$REPO_DIR/recipes/diar_ssl/exp/$EXP_NAME"
 
 # 输入输出配置（可根据需要修改或通过环境变量传入）
 IN_ROOT="${IN_ROOT:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios}"
-OUT_BASE_DIR="${OUT_BASE_DIR:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios_Diarizen_fbank_conformer}"
+OUT_BASE_DIR="${OUT_BASE_DIR:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios_Diarizen_fbank_conformer_finetune}"
 DEVICE="${DEVICE:-auto}"
 
 # 激活环境

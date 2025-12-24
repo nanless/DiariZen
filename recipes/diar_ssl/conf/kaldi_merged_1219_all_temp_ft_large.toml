@@ -1,0 +1,119 @@
+[meta]
+save_dir = "exp"
+seed = 3407
+# save_dir 相对 recipes/diar_ssl，所有日志与 checkpoint 均写入此目录
+
+[finetune]
+finetune = true
+ckpt_dir = "/root/code/github_repos/DiariZen/cache/models--BUT-FIT--diarizen-wavlm-large-s80-md/snapshots/7030f2c7fe847c49b2390511bb4c3f8b90dbc022/pytorch_model.bin"
+# ckpt_dir 为微调起点权重路径（WavLM-Large）
+
+[trainer]
+path = "trainer_dual_opt.Trainer"
+[trainer.args]
+max_epochs = 30
+gradient_percentile = 90
+gradient_history_size = 1000
+save_max_score = false
+save_ckpt_interval = 1
+max_patience = 10
+max_num_checkpoints = 100
+gradient_accumulation_steps = 1
+validation_interval = 1
+freeze_wavlm = false
+lr_decay = false
+use_one_cycle_lr = false
+# 说明：
+# - validation_interval=1：每轮验证一次；max_patience=10：验证早停耐心
+# - max_num_checkpoints=100：最多保留 100 个 checkpoint
+# - gradient_accumulation_steps=1：可按显存调高以累积小 batch
+# - freeze_wavlm=false：默认微调主干；如想只训头部可设为 true
+
+[optimizer_small]
+path = "torch.optim.AdamW"
+[optimizer_small.args]
+lr = 5e-6
+# optimizer_small 通常用于 WavLM 主干，学习率较小（large 模型使用更小的 lr）
+
+[optimizer_big]
+path = "torch.optim.AdamW"
+[optimizer_big.args]
+lr = 1e-4
+# optimizer_big 用于上层头部，学习率相对更大
+
+[model]
+path = "diarizen.models.eend.model_wavlm_conformer.Model"
+[model.args]
+wavlm_src = "wavlm_large_s80_md"
+wavlm_layer_num = 25
+wavlm_feat_dim = 1024
+attention_in = 256
+ffn_hidden = 1024
+num_head = 4
+num_layer = 4
+dropout = 0.1
+chunk_size = 2
+use_posi = false
+output_activate_function = false
+selected_channel = 0
+max_speakers_per_chunk = 4
+max_speakers_per_frame = 4
+# 说明：
+# - wavlm_layer_num=25 表示使用全部层（large 模型共 25 层）
+# - wavlm_feat_dim=1024 是 large 模型的特征维度（base 是 768）
+# - attention_in/ffn_hidden/num_head/num_layer 为 Conformer 超参
+# - chunk_size 与数据集的 chunk_size 保持一致
+# - max_speakers_per_chunk/max_speakers_per_frame 控制说话人数上限（影响标签裁剪）
+
+[train_dataset]
+path = "dataset.DiarizationDataset"
+[train_dataset.args]
+scp_file = "data/kaldi_merged_1219_all_temp_ft_large/train/wav.scp"
+rttm_file = "data/kaldi_merged_1219_all_temp_ft_large/train/rttm"
+uem_file = "data/kaldi_merged_1219_all_temp_ft_large/train/all.uem"
+chunk_size = 2
+chunk_shift = 1
+sample_rate = 16000
+full_utterance = true
+max_sessions = 0
+max_chunks = 0
+# full_utterance=1 时按整段裁切，max_sessions 可用于子集调试
+# rttm_file 指向标注；uem_file 提供全时长区间，避免裁切越界
+# max_chunks=0 表示不限制每条录音生成的 chunk 数量
+
+[train_dataset.dataloader]
+batch_size = 64
+num_workers = 16
+prefetch_factor = 4
+persistent_workers = true
+drop_last = true
+pin_memory = true
+# DataLoader 说明：
+# - drop_last=true 保持 batch 大小一致，便于分布式梯度同步
+# - pin_memory=true 加速从 CPU 传输到 GPU
+# - 若 CPU/IO 紧张，可下调 num_workers 或 prefetch_factor
+# - large 模型 batch_size 减半以适应显存限制
+
+[validate_dataset]
+path = "dataset.DiarizationDataset"
+[validate_dataset.args]
+scp_file = "data/kaldi_merged_1219_all_temp_ft_large/dev/wav.scp"
+rttm_file = "data/kaldi_merged_1219_all_temp_ft_large/dev/rttm"
+uem_file = "data/kaldi_merged_1219_all_temp_ft_large/dev/all.uem"
+chunk_size = 2
+chunk_shift = 2
+sample_rate = 16000
+full_utterance = true
+max_sessions = 0
+max_chunks = 0
+# 开发集 chunk_shift 可调大，减少评估步数；评估仍使用与训练一致的模型超参
+# dev 使用专属的 wav/rttm/uem 子集，保持与 train 划分对应
+
+[validate_dataset.dataloader]
+batch_size = 64
+num_workers = 16
+prefetch_factor = 4
+persistent_workers = true
+drop_last = true
+pin_memory = true
+# 若验证阶段显存紧张，可进一步减小 VAL_BATCH_SIZE 或增加 DEV_CHUNK_SHIFT
