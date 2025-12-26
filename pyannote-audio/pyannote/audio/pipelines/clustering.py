@@ -132,6 +132,38 @@ class BaseClustering(Pipeline):
         min_clusters: Optional[int] = None,
         max_clusters: Optional[int] = None,
     ):
+        """设置聚类数量
+        
+        根据提供的参数确定最终的聚类数量范围。
+        处理各种边界情况，确保聚类数量在合理范围内。
+        
+        参数
+        ----------
+        num_embeddings : int
+            可用的嵌入向量数量
+        num_clusters : int, 可选
+            指定的聚类数量（如果提供，将覆盖min/max）
+        min_clusters : int, 可选
+            最小聚类数量
+        max_clusters : int, 可选
+            最大聚类数量
+        
+        返回
+        -------
+        num_clusters : int 或 None
+            确定的聚类数量（如果min==max），否则为None
+        min_clusters : int
+            调整后的最小聚类数量
+        max_clusters : int
+            调整后的最大聚类数量
+        
+        处理逻辑
+        --------
+        1. 如果指定了num_clusters，则min和max都设为该值
+        2. 否则，min默认为1，max默认为num_embeddings
+        3. 确保min和max都在[1, num_embeddings]范围内
+        4. 如果min==max，返回确定的聚类数量
+        """
         min_clusters = num_clusters or min_clusters or 1
         min_clusters = max(1, min(num_embeddings, min_clusters))
         max_clusters = num_clusters or max_clusters or num_embeddings
@@ -216,15 +248,46 @@ class BaseClustering(Pipeline):
         return embeddings[chunk_idx, speaker_idx], chunk_idx, speaker_idx  
 
     def constrained_argmax(self, soft_clusters: np.ndarray, const_location: np.ndarray = None) -> np.ndarray:
+        """约束分配：使用匈牙利算法进行最优分配
+        
+        对每个块中的说话人进行聚类分配，确保同一块中的不同说话人不会被分配到同一聚类。
+        使用匈牙利算法（linear_sum_assignment）找到最优的一对一分配。
+        
+        参数
+        ----------
+        soft_clusters : np.ndarray
+            软聚类分配，形状为(num_chunks, num_speakers, num_clusters)
+            值越大表示该说话人属于该聚类的概率越高
+        const_location : np.ndarray, 可选
+            约束位置掩码，形状为(num_chunks, num_speakers, num_clusters)
+            如果提供，这些位置的soft_clusters值会被设为极小值（禁止分配）
+        
+        返回
+        -------
+        hard_clusters : np.ndarray
+            硬聚类分配，形状为(num_chunks, num_speakers)
+            值-2表示未分配，其他值表示分配的聚类索引
+        
+        算法说明
+        --------
+        1. 对NaN值进行处理（替换为最小值）
+        2. 如果提供了约束位置，将对应位置的分数设为极小值
+        3. 对每个块，使用匈牙利算法找到说话人到聚类的最优一对一分配
+        4. 匈牙利算法确保每个说话人只分配到一个聚类，每个聚类最多分配给一个说话人
+        """
         soft_clusters = np.nan_to_num(soft_clusters, nan=np.nanmin(soft_clusters))
         num_chunks, num_speakers, num_clusters = soft_clusters.shape
         # num_chunks, num_speakers, num_clusters
         if const_location is not None:
+            # 将约束位置设为极小值，禁止这些分配
             soft_clusters[const_location] = -10000      # TODO: try less ad-hoc options
 
+        # 初始化硬聚类分配，-2表示未分配
         hard_clusters = -2 * np.ones((num_chunks, num_speakers), dtype=np.int8)
 
+        # 对每个块使用匈牙利算法进行最优分配
         for c, cost in enumerate(soft_clusters):
+            # linear_sum_assignment找到最优的一对一分配（最大化总分数）
             speakers, clusters = linear_sum_assignment(cost, maximize=True)
             for s, k in zip(speakers, clusters):
                 hard_clusters[c, s] = k
@@ -239,29 +302,53 @@ class BaseClustering(Pipeline):
         train_clusters: np.ndarray,
         constrained: bool = False,
     ):
-        """Assign embeddings to the closest centroid
-
-        Cluster centroids are computed as the average of the train embeddings
-        previously assigned to them.
-
-        Parameters
+        """将嵌入向量分配到最近的聚类中心
+        
+        基于训练嵌入向量的聚类结果，计算每个聚类的中心（质心），
+        然后将所有嵌入向量（包括训练集和测试集）分配到最近的聚类中心。
+        
+        参数
         ----------
-        embeddings : (num_chunks, num_speakers, dimension)-shaped array
-            Complete set of embeddings.
-        train_chunk_idx : (num_embeddings,)-shaped array
-        train_speaker_idx : (num_embeddings,)-shaped array
-            Indices of subset of embeddings used for "training".
-        train_clusters : (num_embedding,)-shaped array
-            Clusters of the above subset
-        constrained : bool, optional
-            Use constrained_argmax, instead of (default) argmax.
-
-        Returns
+        embeddings : np.ndarray
+            完整的嵌入向量集合，形状为(num_chunks, num_speakers, dimension)
+        train_chunk_idx : np.ndarray
+            训练嵌入向量的块索引，形状为(num_embeddings,)
+        train_speaker_idx : np.ndarray
+            训练嵌入向量的说话人索引，形状为(num_embeddings,)
+        train_clusters : np.ndarray
+            训练嵌入向量的聚类分配，形状为(num_embeddings,)
+            值k表示该嵌入向量属于第k个聚类
+        constrained : bool, 默认False
+            是否使用约束分配
+            True：使用constrained_argmax（确保同一块中的说话人不分配到同一聚类）
+            False：使用简单的argmax（默认）
+        
+        返回
         -------
-        soft_clusters : (num_chunks, num_speakers, num_clusters)-shaped array
-        hard_clusters : (num_chunks, num_speakers)-shaped array
-        centroids : (num_clusters, dimension)-shaped array
-            Clusters centroids
+        hard_clusters : np.ndarray
+            硬聚类分配，形状为(num_chunks, num_speakers)
+            值k表示该说话人被分配到第k个聚类
+        soft_clusters : np.ndarray
+            软聚类分配，形状为(num_chunks, num_speakers, num_clusters)
+            值越大表示该说话人属于该聚类的概率越高
+            计算公式：soft_clusters = 2 - distance（距离越小，分数越高）
+        centroids : np.ndarray
+            聚类中心向量，形状为(num_clusters, dimension)
+            每个聚类中心是该聚类中所有训练嵌入向量的平均值
+        
+        处理流程
+        --------
+        1. 从训练嵌入向量计算每个聚类的中心（质心）
+        2. 计算所有嵌入向量到所有聚类中心的距离
+        3. 将距离转换为相似度分数（soft_clusters = 2 - distance）
+        4. 根据相似度分数进行分配：
+           - 约束分配：使用匈牙利算法确保同一块中的说话人不冲突
+           - 非约束分配：简单选择最相似的聚类
+        
+        注意
+        -----
+        - 训练嵌入向量可能会被重新分配到不同的聚类（基于所有嵌入向量的全局最优分配）
+        - 实验表明，这种重新分配通常能获得更好的结果
         """
 
         # TODO: option to add a new (dummy) cluster in case num_clusters < max(frame_speaker_count)
@@ -269,8 +356,10 @@ class BaseClustering(Pipeline):
         num_clusters = np.max(train_clusters) + 1
         num_chunks, num_speakers, dimension = embeddings.shape
 
+        # 提取训练嵌入向量
         train_embeddings = embeddings[train_chunk_idx, train_speaker_idx]
 
+        # 计算每个聚类的中心（质心）：该聚类中所有训练嵌入向量的平均值
         centroids = np.vstack(
             [
                 np.mean(train_embeddings[train_clusters == k], axis=0)
@@ -278,7 +367,10 @@ class BaseClustering(Pipeline):
             ]
         )
 
-        # compute distance between embeddings and clusters
+        # 计算所有嵌入向量到所有聚类中心的距离
+        # 1. 将嵌入向量reshape为(num_chunks * num_speakers, dimension)
+        # 2. 计算到所有聚类中心的距离矩阵：(num_chunks * num_speakers, num_clusters)
+        # 3. 重新reshape为(num_chunks, num_speakers, num_clusters)
         e2k_distance = rearrange(
             cdist(
                 rearrange(embeddings, "c s d -> (c s) d"),
@@ -289,12 +381,16 @@ class BaseClustering(Pipeline):
             c=num_chunks,
             s=num_speakers,
         )
+        # 将距离转换为相似度分数（距离越小，分数越高）
+        # 对于余弦距离，范围是[0, 2]，所以使用2 - distance
         soft_clusters = 2 - e2k_distance
 
-        # assign each embedding to the cluster with the most similar centroid
+        # 将每个嵌入向量分配到最相似的聚类中心
         if constrained:
+            # 约束分配：使用匈牙利算法，确保同一块中的说话人不分配到同一聚类
             hard_clusters = self.constrained_argmax(soft_clusters)
         else:
+            # 非约束分配：简单选择最相似的聚类
             hard_clusters = np.argmax(soft_clusters, axis=2)
 
         # NOTE: train_embeddings might be reassigned to a different cluster
@@ -312,35 +408,51 @@ class BaseClustering(Pipeline):
         max_clusters: Optional[int] = None,
         **kwargs,
     ) -> np.ndarray:
-        """Apply clustering
-
-        Parameters
+        """应用聚类算法
+        
+        这是聚类管道的主入口，执行完整的聚类流程：
+        1. 过滤和采样嵌入向量
+        2. 确定聚类数量
+        3. 对训练嵌入向量进行聚类
+        4. 将所有嵌入向量分配到聚类中心
+        
+        参数
         ----------
-        embeddings : (num_chunks, num_speakers, dimension) array
-            Sequence of embeddings.
-        segmentations : (num_chunks, num_frames, num_speakers) array
-            Binary segmentations.
-        num_clusters : int, optional
-            Number of clusters, when known. Default behavior is to use
-            internal threshold hyper-parameter to decide on the number
-            of clusters.
-        min_clusters : int, optional
-            Minimum number of clusters. Has no effect when `num_clusters` is provided.
-        max_clusters : int, optional
-            Maximum number of clusters. Has no effect when `num_clusters` is provided.
-
-        Returns
+        embeddings : np.ndarray
+            嵌入向量序列，形状为(num_chunks, num_speakers, dimension)
+            每个块可能有多个说话人的嵌入向量
+        segmentations : SlidingWindowFeature, 可选
+            二值化分割结果，形状为(num_chunks, num_frames, num_speakers)
+            用于过滤嵌入向量（只保留有足够干净帧的说话人）
+        num_clusters : int, 可选
+            指定的聚类数量。如果提供，将覆盖min/max参数
+        min_clusters : int, 可选
+            最小聚类数量。当num_clusters未提供时使用
+        max_clusters : int, 可选
+            最大聚类数量。当num_clusters未提供时使用
+        
+        返回
         -------
-        hard_clusters : (num_chunks, num_speakers) array
-            Hard cluster assignment (hard_clusters[c, s] = k means that sth speaker
-            of cth chunk is assigned to kth cluster)
-        soft_clusters : (num_chunks, num_speakers, num_clusters) array
-            Soft cluster assignment (the higher soft_clusters[c, s, k], the most likely
-            the sth speaker of cth chunk belongs to kth cluster)
-        centroids : (num_clusters, dimension) array
-            Centroid vectors of each cluster
+        hard_clusters : np.ndarray
+            硬聚类分配，形状为(num_chunks, num_speakers)
+            hard_clusters[c, s] = k 表示第c个块的第s个说话人被分配到第k个聚类
+        soft_clusters : np.ndarray
+            软聚类分配，形状为(num_chunks, num_speakers, num_clusters)
+            soft_clusters[c, s, k] 值越大，表示第c个块的第s个说话人属于第k个聚类的概率越高
+        centroids : np.ndarray
+            聚类中心向量，形状为(num_clusters, dimension)
+            每个聚类中心是该聚类中所有嵌入向量的平均值
+        
+        处理流程
+        --------
+        1. 过滤嵌入向量：移除无效（NaN）和低质量嵌入，如果太多则随机采样
+        2. 确定聚类数量：根据参数和嵌入向量数量确定最终的聚类数量范围
+        3. 特殊情况处理：如果只需要1个聚类，直接返回所有嵌入向量的平均值作为中心
+        4. 训练聚类：对训练嵌入向量应用聚类算法（由子类实现）
+        5. 分配嵌入：将所有嵌入向量分配到聚类中心
         """
 
+        # 步骤1：过滤和采样嵌入向量
         train_embeddings, train_chunk_idx, train_speaker_idx = self.filter_embeddings(
             embeddings,
             segmentations=segmentations,
@@ -348,6 +460,7 @@ class BaseClustering(Pipeline):
 
         num_embeddings, _ = train_embeddings.shape
 
+        # 步骤2：确定聚类数量
         num_clusters, min_clusters, max_clusters = self.set_num_clusters(
             num_embeddings,
             num_clusters=num_clusters,
@@ -355,14 +468,17 @@ class BaseClustering(Pipeline):
             max_clusters=max_clusters,
         )
 
+        # 步骤3：特殊情况处理（只需要1个聚类）
         if max_clusters < 2:
-            # do NOT apply clustering when min_clusters = max_clusters = 1
+            # 当min_clusters = max_clusters = 1时，不需要聚类
             num_chunks, num_speakers, _ = embeddings.shape
             hard_clusters = np.zeros((num_chunks, num_speakers), dtype=np.int8)
             soft_clusters = np.ones((num_chunks, num_speakers, 1))
+            # 所有嵌入向量的平均值作为唯一的聚类中心
             centroids = np.mean(train_embeddings, axis=0, keepdims=True)
             return hard_clusters, soft_clusters, centroids
 
+        # 步骤4：对训练嵌入向量进行聚类（由子类实现）
         train_clusters = self.cluster(
             train_embeddings,
             min_clusters,
@@ -370,6 +486,7 @@ class BaseClustering(Pipeline):
             num_clusters=num_clusters,
         )
 
+        # 步骤5：将所有嵌入向量分配到聚类中心
         hard_clusters, soft_clusters, centroids = self.assign_embeddings(
             embeddings,
             train_chunk_idx,
@@ -382,21 +499,46 @@ class BaseClustering(Pipeline):
 
 
 class AgglomerativeClustering(BaseClustering):
-    """Agglomerative clustering
-
-    Parameters
+    """凝聚聚类（Agglomerative Clustering）
+    
+    使用层次聚类算法对说话人嵌入向量进行聚类。
+    这是默认的聚类算法，速度快且效果良好。
+    
+    工作原理
+    --------
+    1. 从每个嵌入向量作为一个独立的聚类开始
+    2. 迭代合并最相似的两个聚类
+    3. 根据阈值或聚类数量停止合并
+    4. 处理小聚类：将过小的聚类重新分配到最近的 large cluster
+    
+    参数
     ----------
-    metric : {"cosine", "euclidean", ...}, optional
-        Distance metric to use. Defaults to "cosine".
-
-    Hyper-parameters
+    metric : str, 默认"cosine"
+        距离度量方式，用于计算嵌入向量之间的距离
+        可选："cosine"（余弦距离）、"euclidean"（欧氏距离）等
+    max_num_embeddings : int, 默认np.inf
+        最大嵌入向量数量（用于加速）
+    constrained_assignment : bool, 默认True
+        是否使用约束分配（确保同一块中的说话人不分配到同一聚类）
+    
+    超参数
     ----------------
-    method : {"average", "centroid", "complete", "median", "single", "ward"}
-        Linkage method.
-    threshold : float in range [0.0, 2.0]
-        Clustering threshold.
-    min_cluster_size : int in range [1, 20]
-        Minimum cluster size
+    method : str
+        链接方法（linkage method），可选：
+        - "average": 平均链接（推荐）
+        - "centroid": 质心链接
+        - "complete": 完全链接
+        - "median": 中位数链接
+        - "single": 单链接
+        - "ward": Ward链接
+        - "weighted": 加权链接
+    threshold : float
+        聚类阈值，范围[0.0, 2.0]
+        当聚类间距离超过此阈值时停止合并
+        假设嵌入向量已归一化（单位长度）
+    min_cluster_size : int
+        最小聚类大小，范围[1, 20]
+        小于此大小的聚类会被重新分配到最近的 large cluster
     """
 
     def __init__(
@@ -426,24 +568,38 @@ class AgglomerativeClustering(BaseClustering):
         max_clusters: int,
         num_clusters: Optional[int] = None,
     ):
-        """
-
-        Parameters
+        """执行凝聚聚类
+        
+        使用层次聚类算法对嵌入向量进行聚类。
+        首先构建层次树（dendrogram），然后根据阈值或目标聚类数量进行切割。
+        
+        参数
         ----------
-        embeddings : (num_embeddings, dimension) array
-            Embeddings
+        embeddings : np.ndarray
+            嵌入向量，形状为(num_embeddings, dimension)
         min_clusters : int
-            Minimum number of clusters
+            最小聚类数量
         max_clusters : int
-            Maximum number of clusters
-        num_clusters : int, optional
-            Actual number of clusters. Default behavior is to estimate it based
-            on values provided for `min_clusters`,  `max_clusters`, and `threshold`.
-
-        Returns
+            最大聚类数量
+        num_clusters : int, 可选
+            目标聚类数量。如果提供，会尝试找到最接近此数量的聚类结果
+            如果为None，则根据threshold参数自动确定
+        
+        返回
         -------
-        clusters : (num_embeddings, ) array
-            0-indexed cluster indices.
+        clusters : np.ndarray
+            聚类分配结果，形状为(num_embeddings,)
+            值k表示该嵌入向量属于第k个聚类（从0开始索引）
+        
+        处理流程
+        --------
+        1. 调整min_cluster_size以适应小数据集
+        2. 特殊情况：只有一个嵌入向量时直接返回
+        3. 根据metric和method选择合适的距离计算方式
+        4. 构建层次树（dendrogram）
+        5. 根据threshold切割层次树
+        6. 处理小聚类：重新分配到最近的large cluster
+        7. 如果指定了num_clusters，遍历层次树找到最接近的聚类结果
         """
 
         num_embeddings, _ = embeddings.shape
@@ -573,7 +729,25 @@ class AgglomerativeClustering(BaseClustering):
 
 
 class OracleClustering(BaseClustering):
-    """Oracle clustering"""
+    """Oracle聚类（完美聚类）
+    
+    这是一个理想化的聚类算法，使用真实标注（ground truth）来确定聚类分配。
+    主要用于：
+    - 性能上限评估（upper bound）
+    - 对比实验
+    - 调试和测试
+    
+    工作原理
+    --------
+    1. 从真实标注中提取oracle分割结果
+    2. 使用排列算法（permutation）将预测分割与oracle分割对齐
+    3. 根据对齐结果分配聚类标签
+    
+    注意
+    -----
+    这不是一个实际的聚类系统，而是使用真实标注作为"预测"结果。
+    需要音频文件包含"annotation"键（真实说话人标注）。
+    """
 
     def __call__(
         self,
@@ -583,28 +757,40 @@ class OracleClustering(BaseClustering):
         frames: Optional[SlidingWindow] = None,
         **kwargs,
     ) -> np.ndarray:
-        """Apply oracle clustering
-
-        Parameters
+        """应用Oracle聚类
+        
+        使用真实标注来确定聚类分配，这是性能的上限。
+        
+        参数
         ----------
-        embeddings : (num_chunks, num_speakers, dimension) array, optional
-            Sequence of embeddings. When provided, compute speaker centroids
-            based on these embeddings.
-        segmentations : (num_chunks, num_frames, num_speakers) array
-            Binary segmentations.
+        embeddings : np.ndarray, 可选
+            嵌入向量序列，形状为(num_chunks, num_speakers, dimension)
+            如果提供，会基于这些嵌入向量计算说话人中心
+        segmentations : SlidingWindowFeature
+            预测的分割结果，形状为(num_chunks, num_frames, num_speakers)
         file : AudioFile
+            音频文件，必须包含"annotation"键（真实说话人标注）
         frames : SlidingWindow
-
-        Returns
+            滑动窗口配置，用于对齐时间帧
+        
+        返回
         -------
-        hard_clusters : (num_chunks, num_speakers) array
-            Hard cluster assignment (hard_clusters[c, s] = k means that sth speaker
-            of cth chunk is assigned to kth cluster)
-        soft_clusters : (num_chunks, num_speakers, num_clusters) array
-            Soft cluster assignment (the higher soft_clusters[c, s, k], the most likely
-            the sth speaker of cth chunk belongs to kth cluster)
-        centroids : (num_clusters, dimension), optional
-            Clusters centroids if `embeddings` is provided, None otherwise.
+        hard_clusters : np.ndarray
+            硬聚类分配，形状为(num_chunks, num_speakers)
+            hard_clusters[c, s] = k 表示第c个块的第s个说话人被分配到第k个聚类
+        soft_clusters : np.ndarray
+            软聚类分配，形状为(num_chunks, num_speakers, num_clusters)
+            soft_clusters[c, s, k] = 1.0 表示该说话人属于该聚类，否则为0.0
+        centroids : np.ndarray, 可选
+            聚类中心向量，形状为(num_clusters, dimension)
+            如果提供了embeddings，则计算中心；否则为None
+        
+        处理流程
+        --------
+        1. 从真实标注生成oracle分割结果
+        2. 对每个块，使用排列算法将预测分割与oracle分割对齐
+        3. 根据对齐结果分配聚类标签
+        4. 如果提供了embeddings，计算聚类中心
         """
 
         num_chunks, num_frames, num_speakers = segmentations.data.shape
@@ -658,6 +844,56 @@ class OracleClustering(BaseClustering):
 
 
 class VBxClustering(BaseClustering):
+    """VBx聚类（变分贝叶斯聚类）
+    
+    使用变分贝叶斯（Variational Bayes）方法进行说话人聚类。
+    这是精度最高的聚类算法，但计算成本也较高。
+    
+    工作原理
+    --------
+    1. AHC（Agglomerative Hierarchical Clustering）：使用层次聚类获得初始聚类
+    2. LDA降维：使用线性判别分析将嵌入向量降维
+    3. PLDA变换：使用概率线性判别分析（PLDA）进一步变换特征
+    4. VBx迭代优化：使用变分贝叶斯方法迭代优化聚类结果
+    
+    参数
+    ----------
+    metric : str, 默认"cosine"
+        距离度量方式（用于最终分配）
+    max_num_embeddings : int, 默认np.inf
+        最大嵌入向量数量
+    constrained_assignment : bool, 默认True
+        是否使用约束分配
+    plda_dir : str, 默认""
+        PLDA模型目录路径
+        必须包含PLDA模型文件（用于特征变换）
+    lda_dim : int, 默认128
+        LDA降维后的维度
+    maxIters : int, 默认20
+        VBx迭代优化的最大迭代次数
+    
+    超参数
+    ----------------
+    ahc_criterion : str
+        AHC停止准则，可选：
+        - "maxclust": 基于最大聚类数量
+        - "distance": 基于聚类间距离
+    ahc_threshold : int 或 float
+        AHC阈值
+        - 如果criterion="maxclust": 整数，范围[0, 30]，表示最大聚类数量
+        - 如果criterion="distance": 浮点数，范围[0.5, 0.8]，表示距离阈值
+    Fa : float
+        VBx超参数，范围[0.01, 0.5]
+        控制聚类先验分布的参数
+    Fb : float
+        VBx超参数，范围[0.01, 15.0]
+        控制聚类先验分布的参数
+    
+    参考
+    -----
+    VBx: A fully Bayesian method for speaker clustering
+    https://github.com/BUTSpeechFIT/VBx
+    """
     def __init__(
         self,
         metric: str = "cosine",
@@ -673,64 +909,114 @@ class VBxClustering(BaseClustering):
             constrained_assignment=constrained_assignment,
         )
 
+        # AHC（层次聚类）参数
         self.ahc_criterion = Categorical(["maxclust", "distance"])
         if self.ahc_criterion == "maxclust":
-            self.ahc_threshold = Integer(0, 30)    # set the max to 30
+            self.ahc_threshold = Integer(0, 30)    # 最大聚类数量
         else:
-            self.ahc_threshold = Uniform(0.5, 0.8)  # assume unit-normalized embeddings
+            self.ahc_threshold = Uniform(0.5, 0.8)  # 距离阈值（假设单位归一化嵌入）
 
-        # VBx
-        self.plda_dir = plda_dir
-        self.lda_dim = lda_dim
-        self.maxIters = maxIters
+        # VBx参数
+        self.plda_dir = plda_dir  # PLDA模型目录
+        self.lda_dim = lda_dim  # LDA降维维度
+        self.maxIters = maxIters  # 最大迭代次数
 
-        # tuned VBx hyper params
-        self.Fa = Uniform(0.01, 0.5)
-        self.Fb = Uniform(0.01, 15.0)
+        # VBx超参数（用于优化）
+        self.Fa = Uniform(0.01, 0.5)  # VBx先验参数a
+        self.Fb = Uniform(0.01, 15.0)  # VBx先验参数b
 
     def __call__(
         self,
         embeddings: np.ndarray,
         segmentations: Optional[SlidingWindowFeature] = None,
-        num_clusters: Optional[int] = None,     # not used but kept for compatibility
-        min_clusters: Optional[int] = None,     # not used but kept for compatibility
-        max_clusters: Optional[int] = None,     # not used but kept for compatibility
+        num_clusters: Optional[int] = None,     # 未使用，保留以保持兼容性
+        min_clusters: Optional[int] = None,     # 未使用，保留以保持兼容性
+        max_clusters: Optional[int] = None,     # 未使用，保留以保持兼容性
     ) -> np.ndarray:
+        """应用VBx聚类
+        
+        使用变分贝叶斯方法进行说话人聚类。
+        结合AHC初始化和VBx迭代优化。
+        
+        参数
+        ----------
+        embeddings : np.ndarray
+            嵌入向量序列，形状为(num_chunks, num_speakers, dimension)
+        segmentations : SlidingWindowFeature, 可选
+            二值化分割结果，用于过滤嵌入向量
+        num_clusters : int, 可选
+            未使用，保留以保持兼容性
+        min_clusters : int, 可选
+            未使用，保留以保持兼容性
+        max_clusters : int, 可选
+            未使用，保留以保持兼容性
+        
+        返回
+        -------
+        hard_clusters : np.ndarray
+            硬聚类分配，形状为(num_chunks, num_speakers)
+        soft_clusters : np.ndarray
+            软聚类分配，形状为(num_chunks, num_speakers, num_clusters)
+        centroids : np.ndarray
+            聚类中心向量，形状为(num_clusters, dimension)
+        
+        处理流程
+        --------
+        1. 过滤嵌入向量（只保留有足够干净帧的说话人）
+        2. AHC初始化：使用层次聚类获得初始聚类
+        3. PLDA变换：加载PLDA模型并变换特征
+        4. VBx优化：使用变分贝叶斯方法迭代优化聚类
+        5. 计算聚类中心：基于VBx结果计算中心
+        6. 分配嵌入：将所有嵌入向量分配到聚类中心
+        """
+        # 步骤1：过滤嵌入向量
         train_embeddings, _, _ = self.filter_embeddings(
             embeddings,
             segmentations=segmentations,
-            min_frames_ratio=0.1
+            min_frames_ratio=0.1  # 至少需要10%的干净帧
         )
         
+        # 特殊情况：嵌入向量太少，无法聚类
         if train_embeddings.shape[0] < 2:
-            # do NOT apply clustering when the number of training embeddings is less than 2
             num_chunks, num_speakers, _ = embeddings.shape
             hard_clusters = np.zeros((num_chunks, num_speakers), dtype=np.int8)
             soft_clusters = np.ones((num_chunks, num_speakers, 1))
             centroids = np.mean(train_embeddings, axis=0, keepdims=True)
             return hard_clusters, soft_clusters, centroids
             
-        # AHC
+        # 步骤2：AHC（层次聚类）初始化
+        # 归一化嵌入向量（单位长度）
         train_embeddings_normed = train_embeddings / np.linalg.norm(train_embeddings, axis=1, keepdims=True)
+        # 构建层次树（使用质心链接和欧氏距离）
         dendrogram = linkage(
             train_embeddings_normed, method="centroid", metric="euclidean"
         )
+        # 根据阈值切割层次树，获得初始聚类
         ahc_clusters = fcluster(dendrogram, self.ahc_threshold, criterion=self.ahc_criterion) - 1
+        # 重新编号聚类（从0开始）
         _, ahc_clusters = np.unique(ahc_clusters, return_inverse=True)
      
-        # VBx
+        # 步骤3：PLDA变换和VBx优化
+        # 加载PLDA模型和变换函数
         x_tf, plda_tf, plda_psi = vbx_setup(self.plda_dir) 
+        # 应用LDA降维和PLDA变换
         fea = plda_tf(x_tf(train_embeddings), lda_dim=self.lda_dim)
+        # 提取PLDA的Phi矩阵（前lda_dim维）
         Phi = plda_psi[:self.lda_dim]
+        # 应用VBx聚类优化
         q, sp = cluster_vbx(
             ahc_clusters, fea, Phi,
             Fa=self.Fa, Fb=self.Fb, maxIters=self.maxIters 
         )
 
-        # calculate distance
+        # 步骤4：计算聚类中心
         num_chunks, num_speakers, dimension = embeddings.shape
-        centroids = (q[:, sp > 1e-7].T @ train_embeddings.reshape(-1, dimension))  # not division needed, cos-sim follows
+        # 只保留活跃的聚类（sp > 1e-7）
+        # q是VBx优化的聚类参数，用于计算中心
+        centroids = (q[:, sp > 1e-7].T @ train_embeddings.reshape(-1, dimension))
+        # 注意：不需要除以范数，因为后续使用余弦相似度
 
+        # 步骤5：计算所有嵌入向量到聚类中心的距离
         e2k_distance = rearrange(
             cdist(
                 rearrange(embeddings, "c s d -> (c s) d"),
@@ -741,18 +1027,21 @@ class VBxClustering(BaseClustering):
             c=num_chunks,
             s=num_speakers,
         )
+        # 将距离转换为相似度分数
         soft_clusters = 2 - e2k_distance 
 
-        # assign each embedding to the cluster with the most similar centroid
+        # 步骤6：分配嵌入向量到聚类
         if self.constrained_assignment:
+            # 约束分配：使用匈牙利算法
             hard_clusters = self.constrained_argmax(
                 soft_clusters, 
                 const_location=None
             )
         else:
+            # 非约束分配：简单选择最相似的聚类
             hard_clusters = np.argmax(soft_clusters, axis=2)
 
-        # re-number clusters from 0 to num_large_clusters
+        # 重新编号聚类（从0开始连续编号）
         _, hard_clusters = np.unique(hard_clusters, return_inverse=True)
         hard_clusters = hard_clusters.reshape(num_chunks, num_speakers)
 

@@ -20,6 +20,20 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+"""
+感受野计算工具
+
+该模块提供了一系列函数用于计算卷积神经网络的感受野（receptive field）。
+感受野是深度学习中重要的概念，它定义了输出中每个点对应的输入范围。
+
+主要功能：
+1. 计算单层/多层卷积后的输出帧数
+2. 计算单层/多层卷积的感受野大小
+3. 计算感受野的中心位置
+
+这些函数对于理解模型的时间分辨率和进行时间对齐非常重要。
+"""
+
 from typing import List
 
 
@@ -91,8 +105,20 @@ def multi_conv_num_frames(
     处理流程
     --------
     逐层计算：每层的输出作为下一层的输入
+    从第一层开始，依次应用每层的卷积操作，计算最终的输出帧数
+    
+    示例
+    -----
+    假设有2层卷积：
+    - 第1层：kernel_size=10, stride=5, padding=0, dilation=1
+      输入1000个样本 -> 输出199帧
+    - 第2层：kernel_size=3, stride=2, padding=0, dilation=1
+      输入199帧 -> 输出99帧
+    最终输出：99帧
     """
+    # 初始化为输入样本数
     num_frames = num_samples
+    # 逐层应用卷积，每层的输出作为下一层的输入
     for k, s, p, d in zip(kernel_size, stride, padding, dilation):
         num_frames = conv1d_num_frames(
             num_frames, kernel_size=k, stride=s, padding=p, dilation=d
@@ -129,12 +155,29 @@ def conv1d_receptive_field_size(num_frames=1, kernel_size=5, stride=1, dilation=
     
     说明
     -----
-    - 有效卷积核大小考虑了膨胀率
+    - 有效卷积核大小考虑了膨胀率（dilation）
+      dilation=1时，有效卷积核大小 = kernel_size
+      dilation=2时，有效卷积核大小 = 1 + (kernel_size-1)*2
     - 感受野大小包括所有输出帧对应的输入范围
+      单个输出帧：感受野 = 有效卷积核大小
+      多个输出帧：感受野 = 有效卷积核大小 + (num_frames-1) * stride
+      
+    示例
+    -----
+    kernel_size=5, stride=2, dilation=1, num_frames=1:
+    有效卷积核大小 = 1 + (5-1)*1 = 5
+    感受野 = 5 + (1-1)*2 = 5
+    
+    kernel_size=5, stride=2, dilation=1, num_frames=3:
+    有效卷积核大小 = 5
+    感受野 = 5 + (3-1)*2 = 9
     """
     # 计算有效卷积核大小（考虑膨胀率）
+    # dilation=1: 有效大小 = kernel_size
+    # dilation=2: 有效大小 = 1 + (kernel_size-1)*2
     effective_kernel_size = 1 + (kernel_size - 1) * dilation
     # 感受野 = 有效卷积核大小 + (输出帧数-1) * 步长
+    # 第一部分是单个帧的感受野，第二部分是多个帧之间的间隔
     return effective_kernel_size + (num_frames - 1) * stride
 
 
@@ -171,11 +214,25 @@ def multi_conv_receptive_field_size(
     -----
     从最后一层开始，反向计算每层的感受野
     每层的感受野会累加到前一层
+    这是因为感受野是从输出向输入反向传播的
+    
+    示例
+    -----
+    假设有2层卷积：
+    - 第2层（最后一层）：kernel_size=3, stride=2, dilation=1
+      输出1帧 -> 感受野 = 3
+    - 第1层：kernel_size=10, stride=5, dilation=1
+      输入3帧（来自第2层的感受野）-> 感受野 = 10 + (3-1)*5 = 20
+    总感受野：20个样本
     """
+    # 初始化为输出帧数（最后一层的"输入"）
     receptive_field_size = num_frames
 
     # 从后往前遍历各层（反向计算）
+    # reversed确保从最后一层开始计算
     for k, s, d in reversed(list(zip(kernel_size, stride, dilation))):
+        # 计算当前层的感受野
+        # 注意：这里的num_frames参数实际上是上一层（更靠近输出）的感受野大小
         receptive_field_size = conv1d_receptive_field_size(
             num_frames=receptive_field_size,
             kernel_size=k,
@@ -215,13 +272,30 @@ def conv1d_receptive_field_center(
     effective_kernel_size = 1 + (kernel_size - 1) * dilation
     center = frame * stride + (effective_kernel_size - 1) // 2 - padding
     
+    说明
+    -----
+    - frame * stride: 输出帧在输入中的起始位置
+    - (effective_kernel_size - 1) // 2: 卷积核的中心偏移（从起始位置到中心）
+    - padding: 填充会向左移动感受野，所以需要减去
+    
     用途
     -----
     用于对齐输入和输出的时间位置
+    例如：确定输出帧i对应的输入音频的时间点
+    
+    示例
+    -----
+    frame=0, kernel_size=5, stride=2, padding=0, dilation=1:
+    有效卷积核大小 = 5
+    中心 = 0*2 + (5-1)//2 - 0 = 2
+    即输出帧0对应输入样本2（从0开始计数）
     """
     # 计算有效卷积核大小（考虑膨胀率）
     effective_kernel_size = 1 + (kernel_size - 1) * dilation
-    # 计算中心位置：帧位置 * 步长 + 卷积核中心偏移 - 填充
+    # 计算中心位置：
+    # 1. frame * stride: 输出帧在输入中的起始位置
+    # 2. (effective_kernel_size - 1) // 2: 从起始位置到卷积核中心的偏移
+    # 3. - padding: 填充会向左移动感受野，需要减去
     return frame * stride + (effective_kernel_size - 1) // 2 - padding
 
 
@@ -257,11 +331,29 @@ def multi_conv_receptive_field_center(
     算法
     -----
     从最后一层开始，反向计算每层的感受野中心
-    每层的中心位置会作为前一层计算的输入
+    每层的中心位置会作为前一层计算的输入（即前一层对应的"输出帧"）
+    
+    说明
+    -----
+    多层卷积的感受野中心计算需要逐层反向传播：
+    - 最后一层的输出帧 -> 最后一层的感受野中心
+    - 最后一层的感受野中心 -> 倒数第二层的"输出帧"
+    - 倒数第二层的"输出帧" -> 倒数第二层的感受野中心
+    - ... 依此类推
+    
+    示例
+    -----
+    假设有2层卷积，输出帧0：
+    - 第2层：frame=0 -> 中心=2（假设）
+    - 第1层：frame=2（来自第2层的中心）-> 中心=12（假设）
+    最终感受野中心：12
     """
+    # 初始化为输出帧索引（最后一层的"输出帧"）
     receptive_field_center = frame
     # 从后往前遍历各层（反向计算）
     for k, s, p, d in reversed(list(zip(kernel_size, stride, padding, dilation))):
+        # 计算当前层的感受野中心
+        # 注意：这里的frame参数实际上是上一层（更靠近输出）的感受野中心位置
         receptive_field_center = conv1d_receptive_field_center(
             frame=receptive_field_center,
             kernel_size=k,

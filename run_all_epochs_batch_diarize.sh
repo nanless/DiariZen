@@ -15,10 +15,10 @@ set -u
 
 # 配置参数（可根据需要修改）
 IN_ROOT="${IN_ROOT:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios}"
-EXP_NAME="${EXP_NAME:-kaldi_merged_1205_1207_ft_large}"
+EXP_NAME="${EXP_NAME:-kaldi_merged_1219_all_temp_ft_large}"
 CHECKPOINTS_DIR="$REPO_DIR/recipes/diar_ssl/exp/$EXP_NAME/checkpoints"
-CONFIG_PATH="${CONFIG_PATH:-$REPO_DIR/recipes/diar_ssl/exp/$EXP_NAME/config__2025_12_12--17_03_07.toml}"
-OUT_BASE_DIR="${OUT_BASE_DIR:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios_Diarizen_simufinetune_large}"
+CONFIG_PATH="${CONFIG_PATH:-$REPO_DIR/recipes/diar_ssl/exp/$EXP_NAME/config__2025_12_24--02_01_24.toml}"
+OUT_BASE_DIR="${OUT_BASE_DIR:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios_Diarizen_simufinetune_1219_all_temp_large}"
 CACHE_DIR="${CACHE_DIR:-$REPO_DIR/cache}"
 DEVICE="${DEVICE:-auto}"
 
