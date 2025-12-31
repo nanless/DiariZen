@@ -18,6 +18,12 @@ Fbank-Conformer说话人分离模型
 - 使用Fbank特征而不是WavLM预训练特征
 - 特征提取更简单，计算更快
 - 不需要预训练模型，可以直接训练
+- 可选择性支持Fbank滤波器参数在训练中同步更新（通过fbank_requires_grad参数控制）
+
+Fbank参数训练特性：
+- fbank_requires_grad: 控制是否让滤波器参数参与训练（默认False，保持向后兼容）
+- fbank_param_change_factor: 控制参数更新速度（值越小更新越平滑）
+- fbank_param_rand_factor: 添加参数随机化正则化（值越大随机化越强）
 """
 
 import torch
@@ -84,6 +90,12 @@ class Model(BaseModel):
         输入音频的通道数（多通道音频）
     selected_channel : int, 默认0
         选择的通道索引（从多通道中选择一个通道进行处理）
+    fbank_requires_grad : bool, 默认False
+        是否让Fbank滤波器参数在训练中可更新
+    fbank_param_change_factor : float, 默认1.0
+        Fbank参数更新速度控制因子，requires_grad=True时生效
+    fbank_param_rand_factor : float, 默认0.0
+        Fbank参数随机化因子，requires_grad=True时生效
     """
     def __init__(
         self,
@@ -106,6 +118,9 @@ class Model(BaseModel):
         chunk_size: int = 5,
         num_channels: int = 8,
         selected_channel: int = 0,
+        fbank_requires_grad: bool = False,
+        fbank_param_change_factor: float = 1.0,
+        fbank_param_rand_factor: float = 0.0,
     ):
         # 初始化基类，设置说话人分离任务的基本参数
         super().__init__(
@@ -132,11 +147,15 @@ class Model(BaseModel):
         # Fbank特征提取器
         # 将原始音频波形转换为Mel滤波器组特征
         # 输出形状：(batch, frames, n_mels)
+        # 可配置是否让滤波器参数在训练中可更新
         self.make_feats = Fbank(
             n_fft=n_fft,  # FFT窗口大小
             n_mels=n_mels,  # Mel滤波器数量
             win_length=win_length,  # 窗口长度（ms）
-            hop_length=hop_length  # 帧移（ms）
+            hop_length=hop_length,  # 帧移（ms）
+            requires_grad=fbank_requires_grad,  # 是否让滤波器参数在训练中可更新
+            param_change_factor=fbank_param_change_factor,  # 控制参数更新速度
+            param_rand_factor=fbank_param_rand_factor,  # 添加随机化正则化
         )
 
         # 投影层：将Fbank特征维度投影到Conformer的输入维度

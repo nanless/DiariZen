@@ -126,11 +126,37 @@ class Fbank(torch.nn.Module):
             param_change_factor=param_change_factor,
             param_rand_factor=param_rand_factor,
         )
+
+        # Store original forward method
+        self._original_fbank_forward = self.compute_fbanks.forward
+
+        # Monkey patch the _triangular_filters method to ensure device consistency
+        original_triangular_filters = self.compute_fbanks._triangular_filters
+
+        def patched_triangular_filters(all_freqs, f_central, band):
+            # Ensure all_freqs is on the same device as f_central
+            if all_freqs.device != f_central.device:
+                all_freqs = all_freqs.to(f_central.device)
+            # Update device_inp to match f_central device
+            self.compute_fbanks.device_inp = f_central.device
+            return original_triangular_filters(all_freqs, f_central, band)
+
+        self.compute_fbanks._triangular_filters = patched_triangular_filters
         self.compute_deltas = Deltas(input_size=n_mels)
         self.context_window = ContextWindow(
             left_frames=left_frames,
             right_frames=right_frames,
         )
+
+    def to(self, *args, **kwargs):
+        """Override to() method to ensure all submodules and tensors are moved to the same device."""
+        super().to(*args, **kwargs)
+        # Ensure Filterbank parameters and buffers are on the same device
+        self.compute_fbanks.to(*args, **kwargs)
+        # Also move any tensor attributes that might exist
+        if hasattr(self.compute_fbanks, 'all_freqs_mat'):
+            self.compute_fbanks.all_freqs_mat = self.compute_fbanks.all_freqs_mat.to(*args, **kwargs)
+        return self
 
     @fwd_default_precision(cast_inputs=torch.float32)
     def forward(self, wav):
@@ -145,6 +171,10 @@ class Fbank(torch.nn.Module):
         -------
         fbanks : torch.Tensor
         """
+        # Move Filterbank parameters to input device if needed
+        if self.compute_fbanks.f_central.device != wav.device:
+            self.compute_fbanks.to(wav.device)
+
         STFT = self.compute_STFT(wav)
         mag = spectral_magnitude(STFT)
         fbanks = self.compute_fbanks(mag)
