@@ -13,14 +13,14 @@ REPO_DIR="$SCRIPT_DIR"
 export PYTHONPATH="$REPO_DIR/pyannote-audio:$REPO_DIR:$PYTHONPATH"
 
 # 配置参数
-EXP_NAME="kaldi_merged_1219_all_ft_large"
+EXP_NAME="kaldi_merged_1205_1207_fbank_conformer_mel160_1219_all_finetune"
 EXP_DIR="$REPO_DIR/recipes/diar_ssl/exp/$EXP_NAME"
 CHECKPOINTS_DIR="$EXP_DIR/checkpoints"
-CONFIG_PATH="$EXP_DIR/config__2025_12_26--11_44_15.toml"
+CONFIG_PATH="$EXP_DIR/config__2026_01_05--22_05_09.toml"
 
 # 输入和输出目录（根据需要修改或通过环境变量传入）
 IN_ROOT="${IN_ROOT:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios}"
-OUT_BASE_DIR="${OUT_BASE_DIR:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios_Diarizen_simple_large_1219_all}"
+OUT_BASE_DIR="${OUT_BASE_DIR:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios_Diarizen_simple_fbank_mel160_conformer_1219_all_finetune}"
 
 echo "=========================================="
 echo "开始批量运行 simple_diarize.py"

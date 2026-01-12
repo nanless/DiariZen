@@ -35,7 +35,7 @@ lr = 1e-4
 # 从头训练使用较大的学习率
 
 [model]
-path = "diarizen.models.eend.model_fbank_conformer.Model"
+path = "diarizen.models.eend.model_fbank_conformer_refine.Model"
 [model.args]
 n_fft = 400
 n_mels = 160
@@ -48,15 +48,12 @@ num_head = 4
 num_layer = 8
 dropout = 0.1
 chunk_size = 8
-use_posi = false
+use_posi = true
 output_activate_function = false
 selected_channel = 0
 max_speakers_per_chunk = 4
 max_speakers_per_frame = 2
 use_powerset = true
-fbank_requires_grad = true
-fbank_param_change_factor = 1
-fbank_param_rand_factor = 0
 # 说明：
 # - n_fft/n_mels/win_length/hop_length 为 fbank 特征提取参数
 # - attention_in/ffn_hidden/num_head/num_layer 为 Conformer 超参
@@ -65,17 +62,15 @@ fbank_param_rand_factor = 0
 # - max_speakers_per_chunk 控制说话人数上限（影响标签裁剪）
 # - max_speakers_per_frame 控制 powerset 编码的最大同时说话人数（默认 2）
 # - use_powerset 控制是否使用 powerset 模式（默认 true）
-# - fbank_requires_grad 控制是否让fbank滤波器参数参与训练（默认 false）
-# - fbank_param_change_factor/fbank_param_rand_factor 控制fbank参数更新行为
 #   - true: 使用 powerset 模式，模型输出是 (B, T, 2^max_speakers_per_frame) 的 log_softmax，损失函数使用 nll_loss
 #   - false: 使用 multilabel 模式，模型输出是 (B, T, num_speakers) 的 sigmoid，损失函数使用 binary_cross_entropy
 
 [train_dataset]
 path = "dataset.DiarizationDataset"
 [train_dataset.args]
-scp_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_featupdate_1219/train/wav.scp"
-rttm_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_featupdate_1219/train/rttm"
-uem_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_featupdate_1219/train/all.uem"
+scp_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_RoPE_FA_1219_all/train/wav.scp"
+rttm_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_RoPE_FA_1219_all/train/rttm"
+uem_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_RoPE_FA_1219_all/train/all.uem"
 chunk_size = 8
 chunk_shift = 6
 sample_rate = 16000
@@ -102,9 +97,9 @@ pin_memory = true
 [validate_dataset]
 path = "dataset.DiarizationDataset"
 [validate_dataset.args]
-scp_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_featupdate_1219/dev/wav.scp"
-rttm_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_featupdate_1219/dev/rttm"
-uem_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_featupdate_1219/dev/all.uem"
+scp_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_RoPE_FA_1219_all/dev/wav.scp"
+rttm_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_RoPE_FA_1219_all/dev/rttm"
+uem_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_RoPE_FA_1219_all/dev/all.uem"
 chunk_size = 8
 chunk_shift = 8
 sample_rate = 16000

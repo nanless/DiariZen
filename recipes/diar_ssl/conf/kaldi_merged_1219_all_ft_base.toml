@@ -4,13 +4,14 @@ seed = 3407
 # save_dir 相对 recipes/diar_ssl，所有日志与 checkpoint 均写入此目录
 
 [finetune]
-finetune = false
-# finetune = false 表示从头训练，不使用预训练权重
+finetune = true
+ckpt_dir = "/root/code/github_repos/DiariZen/cache/models--BUT-FIT--diarizen-wavlm-base-s80-md/snapshots/a9857fc34908197fb5336d9d0562f291834a04b2/pytorch_model.bin"
+# ckpt_dir 为微调起点权重路径
 
 [trainer]
-path = "trainer_single_opt.Trainer"
+path = "trainer_dual_opt.Trainer"
 [trainer.args]
-max_epochs = 100
+max_epochs = 30
 gradient_percentile = 90
 gradient_history_size = 1000
 save_max_score = false
@@ -26,56 +27,48 @@ use_one_cycle_lr = false
 # - validation_interval=1：每轮验证一次；max_patience=10：验证早停耐心
 # - max_num_checkpoints=100：最多保留 100 个 checkpoint
 # - gradient_accumulation_steps=1：可按显存调高以累积小 batch
-# - fbank conformer 从头训练，使用单优化器，powerset 模式
+# - freeze_wavlm=false：默认微调主干；如想只训头部可设为 true
 
-[optimizer]
+[optimizer_small]
 path = "torch.optim.AdamW"
-[optimizer.args]
+[optimizer_small.args]
+lr = 5e-6
+# optimizer_small 通常用于 WavLM 主干，学习率较小
+
+[optimizer_big]
+path = "torch.optim.AdamW"
+[optimizer_big.args]
 lr = 1e-4
-# 从头训练使用较大的学习率
+# optimizer_big 用于上层头部，学习率相对更大
 
 [model]
-path = "diarizen.models.eend.model_fbank_conformer.Model"
+path = "diarizen.models.eend.model_wavlm_conformer.Model"
 [model.args]
-n_fft = 400
-n_mels = 160
-win_length = 25 # ms
-hop_length = 10 # ms
-sample_rate = 16000
-attention_in = 512
+wavlm_src = "wavlm_base_s80_md"
+wavlm_layer_num = 13
+wavlm_feat_dim = 768
+attention_in = 256
 ffn_hidden = 1024
 num_head = 4
-num_layer = 8
+num_layer = 4
 dropout = 0.1
 chunk_size = 8
 use_posi = false
 output_activate_function = false
 selected_channel = 0
 max_speakers_per_chunk = 4
-max_speakers_per_frame = 2
-use_powerset = true
-fbank_requires_grad = true
-fbank_param_change_factor = 1
-fbank_param_rand_factor = 0
 # 说明：
-# - n_fft/n_mels/win_length/hop_length 为 fbank 特征提取参数
+# - wavlm_layer_num=13 表示使用全部层（base 共 13 层）
 # - attention_in/ffn_hidden/num_head/num_layer 为 Conformer 超参
-# - num_layer 默认 10 层（可通过 NUM_LAYER 环境变量调整）
 # - chunk_size 与数据集的 chunk_size 保持一致
-# - max_speakers_per_chunk 控制说话人数上限（影响标签裁剪）
-# - max_speakers_per_frame 控制 powerset 编码的最大同时说话人数（默认 2）
-# - use_powerset 控制是否使用 powerset 模式（默认 true）
-# - fbank_requires_grad 控制是否让fbank滤波器参数参与训练（默认 false）
-# - fbank_param_change_factor/fbank_param_rand_factor 控制fbank参数更新行为
-#   - true: 使用 powerset 模式，模型输出是 (B, T, 2^max_speakers_per_frame) 的 log_softmax，损失函数使用 nll_loss
-#   - false: 使用 multilabel 模式，模型输出是 (B, T, num_speakers) 的 sigmoid，损失函数使用 binary_cross_entropy
+# - max_speakers_per_chunk 控制单窗口内最大说话人数（影响标签裁剪）
 
 [train_dataset]
 path = "dataset.DiarizationDataset"
 [train_dataset.args]
-scp_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_featupdate_1219/train/wav.scp"
-rttm_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_featupdate_1219/train/rttm"
-uem_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_featupdate_1219/train/all.uem"
+scp_file = "data/kaldi_merged_1219_all_ft_base/train/wav.scp"
+rttm_file = "data/kaldi_merged_1219_all_ft_base/train/rttm"
+uem_file = "data/kaldi_merged_1219_all_ft_base/train/all.uem"
 chunk_size = 8
 chunk_shift = 6
 sample_rate = 16000
@@ -87,7 +80,7 @@ max_chunks = 0
 # max_chunks=0 表示不限制每条录音生成的 chunk 数量
 
 [train_dataset.dataloader]
-batch_size = 64
+batch_size = 96
 num_workers = 16
 prefetch_factor = 4
 persistent_workers = true
@@ -97,14 +90,13 @@ pin_memory = true
 # - drop_last=true 保持 batch 大小一致，便于分布式梯度同步
 # - pin_memory=true 加速从 CPU 传输到 GPU
 # - 若 CPU/IO 紧张，可下调 num_workers 或 prefetch_factor
-# - fbank conformer 模型较小，batch_size 可适当增大
 
 [validate_dataset]
 path = "dataset.DiarizationDataset"
 [validate_dataset.args]
-scp_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_featupdate_1219/dev/wav.scp"
-rttm_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_featupdate_1219/dev/rttm"
-uem_file = "data/kaldi_merged_1205_1207_fbank_conformer_mel160_featupdate_1219/dev/all.uem"
+scp_file = "data/kaldi_merged_1219_all_ft_base/dev/wav.scp"
+rttm_file = "data/kaldi_merged_1219_all_ft_base/dev/rttm"
+uem_file = "data/kaldi_merged_1219_all_ft_base/dev/all.uem"
 chunk_size = 8
 chunk_shift = 8
 sample_rate = 16000
@@ -115,10 +107,10 @@ max_chunks = 0
 # dev 使用专属的 wav/rttm/uem 子集，保持与 train 划分对应
 
 [validate_dataset.dataloader]
-batch_size = 64
+batch_size = 96
 num_workers = 16
 prefetch_factor = 4
 persistent_workers = true
 drop_last = true
 pin_memory = true
-# 若验证阶段显存紧张，可进一步减小 VAL_BATCH_SIZE 或增加 DEV_CHUNK_SHIFT
+# 若验证阶段显存紧张，可减小 VAL_BATCH_SIZE 或增加 DEV_CHUNK_SHIFT

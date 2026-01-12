@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 
-# 用途：在 Kaldi 合并数据上从头训练 fbank-conformer 模型，支持fbank特征参数同步更新。
+# 用途：在 Kaldi 合并数据上从头训练 fbank-conformer 模型。
 # 前提：已准备好 Kaldi 三件套（wav.scp / rttm / reco2dur）。
 # 示例：
 #   bash run_train_kaldi_merged_fbank.sh                             # 默认 4 卡，默认数据路径
 #   DATA_SRC=/data/kaldi EXP_NAME=my_exp NUM_GPUS=2 bash run_train_kaldi_merged_fbank.sh
 #   FORCE_REBUILD_DATA=1 VAL_RATIO=0.2 bash run_train_kaldi_merged_fbank.sh
-#   FBANK_REQUIRES_GRAD=true bash run_train_kaldi_merged_fbank.sh     # 启用fbank参数训练
 #
 # 注意：脚本会自动在 tmux session 中运行，确保断开连接后训练继续。
-#       使用 tmux attach -t diarizen_fbank_mel160_train 查看训练状态。
+#       使用 tmux attach -t diarizen_fbank_mel160_RoPE_FA_train 查看训练状态。
 
 # 严格模式：命令/管道/未定义变量出错时立即退出，避免隐藏错误
 set -euo pipefail
@@ -17,8 +16,8 @@ set -euo pipefail
 # ====== tmux session 管理 ======
 # 自动在 tmux session 中运行，确保断开连接后训练继续
 SCRIPT_DIR="$(cd -- "$(dirname "$0")" && pwd)"
-TMUX_SESSION_NAME="diarizen_fbank_mel160_featupdate_train"
-LOG_FILE="$SCRIPT_DIR/run_train_kaldi_merged_fbank_mel160_featupdate_1219.log"
+TMUX_SESSION_NAME="diarizen_fbank_mel160_RoPE_FA_train"
+LOG_FILE="$SCRIPT_DIR/run_train_kaldi_merged_fbank_mel160_RoPE_FA_1219_all.log"
 
 # 检查是否已经在 tmux session 中
 if [[ -z "${TMUX:-}" ]]; then
@@ -88,7 +87,7 @@ export PYTHONPATH
 # - RESUME=1：从最近 checkpoint 继续；SKIP_TRAIN=1：仅生成配置后退出
 # - NUM_GPUS：应与 CUDA_VISIBLE_DEVICES 个数一致，否则 accelerate 会报错
 DATA_SRC="${DATA_SRC:-/root/group-shared/voiceprint/data/speech/speaker_diarization/kaldi_merged_1219_all}"
-EXP_NAME="${EXP_NAME:-kaldi_merged_1205_1207_fbank_conformer_mel160_featupdate_1219}"
+EXP_NAME="${EXP_NAME:-kaldi_merged_1205_1207_fbank_conformer_mel160_RoPE_FA_1219_all}"
 VAL_RATIO="${VAL_RATIO:-0.05}"          # 10% for dev by default
 SEED="${SEED:-3407}"
 NUM_GPUS="${NUM_GPUS:-$NUM_GPUS}"      # default 4 from env defaults
@@ -113,10 +112,6 @@ CONDA_ENV="${CONDA_ENV:-diarizen}"
 RESUME="${RESUME:-0}"
 FORCE_REBUILD_DATA="${FORCE_REBUILD_DATA:-0}"
 SKIP_TRAIN="${SKIP_TRAIN:-0}"
-# Fbank特征提取参数配置
-FBANK_REQUIRES_GRAD="${FBANK_REQUIRES_GRAD:-true}"  # 是否让fbank参数参与训练，默认true
-FBANK_PARAM_CHANGE_FACTOR="${FBANK_PARAM_CHANGE_FACTOR:-1}"  # fbank参数更新速度
-FBANK_PARAM_RAND_FACTOR="${FBANK_PARAM_RAND_FACTOR:-0}"  # fbank参数随机化因子
 # -----------------------------------------------------------------------------
 
 # 生成各阶段使用的路径，DATA_OUT 下会存放 train/dev 的 Kaldi 文件
@@ -197,7 +192,7 @@ lr = $LR
 # 从头训练使用较大的学习率
 
 [model]
-path = "diarizen.models.eend.model_fbank_conformer.Model"
+path = "diarizen.models.eend.model_fbank_conformer_refine.Model"
 [model.args]
 n_fft = 400
 n_mels = 160
@@ -210,15 +205,12 @@ num_head = 4
 num_layer = ${NUM_LAYER:-8}
 dropout = 0.1
 chunk_size = $CHUNK_SIZE
-use_posi = false
+use_posi = true
 output_activate_function = false
 selected_channel = 0
 max_speakers_per_chunk = 4
 max_speakers_per_frame = ${MAX_SPEAKERS_PER_FRAME:-2}
 use_powerset = $([[ "$USE_POWERSET" == "true" ]] && echo true || echo false)
-fbank_requires_grad = $([[ "$FBANK_REQUIRES_GRAD" == "true" ]] && echo true || echo false)
-fbank_param_change_factor = $FBANK_PARAM_CHANGE_FACTOR
-fbank_param_rand_factor = $FBANK_PARAM_RAND_FACTOR
 # 说明：
 # - n_fft/n_mels/win_length/hop_length 为 fbank 特征提取参数
 # - attention_in/ffn_hidden/num_head/num_layer 为 Conformer 超参
@@ -227,8 +219,6 @@ fbank_param_rand_factor = $FBANK_PARAM_RAND_FACTOR
 # - max_speakers_per_chunk 控制说话人数上限（影响标签裁剪）
 # - max_speakers_per_frame 控制 powerset 编码的最大同时说话人数（默认 2）
 # - use_powerset 控制是否使用 powerset 模式（默认 true）
-# - fbank_requires_grad 控制是否让fbank滤波器参数参与训练（默认 false）
-# - fbank_param_change_factor/fbank_param_rand_factor 控制fbank参数更新行为
 #   - true: 使用 powerset 模式，模型输出是 (B, T, 2^max_speakers_per_frame) 的 log_softmax，损失函数使用 nll_loss
 #   - false: 使用 multilabel 模式，模型输出是 (B, T, num_speakers) 的 sigmoid，损失函数使用 binary_cross_entropy
 
@@ -315,11 +305,17 @@ fi
 # 使用 accelerate 多进程启动训练，可选恢复上次断点
 # - --num_processes 与 NUM_GPUS 对齐；若只用单卡，可设置 NUM_GPUS=1
 # - --main_process_port 需避免与其他作业冲突
+# - --mixed_precision=fp16 开启混合精度训练（若 GPU 不支持 bf16，可改为 fp16）
 # - RESUME_FLAG 会添加 -R，从最近 checkpoint 继续
 # - 输出同时显示在终端和日志文件中
 # - 使用 run_single_opt.py 进行单优化器训练（从头训练）
+# accelerate launch \
+#     --num_processes "$NUM_GPUS" \
+#     --main_process_port "$PORT" \
+#     --mixed_precision "fp16" \
+#     run_single_opt.py -C "$CONF_OUT" -M train $RESUME_FLAG 2>&1 | tee -a "$LOG_FILE"
+
 accelerate launch \
     --num_processes "$NUM_GPUS" \
     --main_process_port "$PORT" \
     run_single_opt.py -C "$CONF_OUT" -M train $RESUME_FLAG 2>&1 | tee -a "$LOG_FILE"
-
