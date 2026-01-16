@@ -1,5 +1,5 @@
 # Custom
-exp*
+exp
 *.log 
 *sge*
 *.err
@@ -153,3 +153,5 @@ dmypy.json
 cache/
 
 data/
+
+*.onnx

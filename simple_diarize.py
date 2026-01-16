@@ -14,6 +14,11 @@ python simple_diarize.py \
   --out-dir /path/to/output
 """
 
+from inference.cpu_runtime import configure_env_single_thread
+
+# Must happen before importing numpy/torch (OpenMP/BLAS stacks)
+configure_env_single_thread()
+
 import argparse
 import json
 from pathlib import Path
@@ -28,6 +33,7 @@ import matplotlib.pyplot as plt
 import toml
 
 from diarizen.utils import instantiate
+from inference.cpu_runtime import configure_torch_single_thread
 
 
 def list_audio_files(root_dir: str) -> List[str]:
@@ -200,7 +206,7 @@ def main():
     parser.add_argument("--ckpt-dir", type=str, required=True, help="checkpoint目录")
     parser.add_argument("--config", type=str, required=True, help="config.toml路径")
     
-    parser.add_argument("--device", type=str, default="cuda", choices=["cuda", "cpu"], help="设备")
+    parser.add_argument("--device", type=str, default="cpu", choices=["cuda", "cpu"], help="设备")
     parser.add_argument("--sample-rate", type=int, default=16000, help="采样率")
     parser.add_argument("--chunk-size", type=float, default=None, help="分块大小（秒），None表示整句推理")
     parser.add_argument("--min-duration", type=float, default=0.0, help="最小段持续时间（秒）")
@@ -208,6 +214,9 @@ def main():
     parser.add_argument("--no-plot", action="store_false", dest="plot", help="关闭可视化")
     
     args = parser.parse_args()
+
+    # Force single-thread CPU execution (even if device=cuda, this keeps CPU-side ops single-threaded)
+    configure_torch_single_thread(torch)
     
     # 路径
     in_root = Path(args.in_root)
@@ -284,7 +293,7 @@ def main():
         x = torch.from_numpy(audio_data).float().unsqueeze(0).to(device)  # (1, channels, samples)
         
         # 推理
-        with torch.no_grad():
+        with torch.inference_mode():
             y_pred = model(x)  # (1, num_frames, num_classes)
         
         print(f"  预测形状: {y_pred.shape}")
