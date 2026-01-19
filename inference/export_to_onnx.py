@@ -25,16 +25,22 @@ from diarizen.utils import instantiate
 
 
 class PowersetToMultilabelHard(nn.Module):
-    def __init__(self, base_model: nn.Module):
+    def __init__(self, base_model: nn.Module, quantize_logprobs: float = 0.0):
         super().__init__()
         self.base_model = base_model
         assert getattr(base_model.specifications, "powerset", False), "expected powerset model"
         mapping = base_model.powerset.mapping  # (num_powerset_classes, num_speakers)
         self.register_buffer("mapping", mapping.float(), persistent=True)
+        self.quantize_logprobs = float(quantize_logprobs)
 
     def forward(self, waveforms: torch.Tensor) -> torch.Tensor:
         # base_model output: log_softmax over powerset classes
         powerset_logprobs = self.base_model(waveforms)  # (B, T, P)
+        # Optional: quantize to reduce argmax flip due to tiny numerical differences across runtimes.
+        # This slightly changes behavior, but helps achieve hard 0/1 parity when desired.
+        if self.quantize_logprobs and self.quantize_logprobs > 0:
+            q = self.quantize_logprobs
+            powerset_logprobs = torch.round(powerset_logprobs / q) * q
         idx = torch.argmax(powerset_logprobs, dim=-1)  # (B, T)
         # gather mapping rows -> (B, T, S)
         return self.mapping[idx]
@@ -49,6 +55,12 @@ def main():
     parser.add_argument("--opset", type=int, default=17, help="ONNX opset version")
     parser.add_argument("--device", type=str, default="cpu", choices=["cpu", "cuda"], help="Export device")
     parser.add_argument("--dummy-seconds", type=float, default=8.0, help="Dummy waveform length (seconds) for tracing")
+    parser.add_argument(
+        "--quantize-logprobs",
+        type=float,
+        default=0.0,
+        help="If >0, quantize powerset logprobs by this step before argmax to improve hard parity.",
+    )
     args = parser.parse_args()
 
     exp_dir = Path(args.exp_dir)
@@ -72,7 +84,7 @@ def main():
 
     device = torch.device(args.device)
     model = model.to(device)
-    wrapped = PowersetToMultilabelHard(model).to(device).eval()
+    wrapped = PowersetToMultilabelHard(model, quantize_logprobs=args.quantize_logprobs).to(device).eval()
 
     sample_rate = int(model_args.get("sample_rate", 16000))
     dummy_len = int(round(args.dummy_seconds * sample_rate))

@@ -10,6 +10,7 @@ NOTE: Run in the `diarizen` conda env.
 from __future__ import annotations
 
 import argparse
+import os
 import statistics
 import time
 from pathlib import Path
@@ -69,13 +70,19 @@ def main():
     parser.add_argument("--sample-rate", type=int, default=16000, help="Expected sample rate")
     parser.add_argument("--max-files", type=int, default=0, help="If >0, only benchmark first N files")
     parser.add_argument("--warmup", type=int, default=2, help="Warmup runs for each backend")
+    parser.add_argument(
+        "--quantize-logprobs",
+        type=float,
+        default=0.0,
+        help="If >0, quantize powerset logprobs by this step before argmax to reduce hard output flips.",
+    )
     args = parser.parse_args()
 
     # Import heavy deps after env is configured.
     import numpy as np
     import torch
 
-    from inference.cpu_runtime import configure_torch_single_thread, make_ort_session
+    from inference.cpu_runtime import configure_torch_single_thread
 
     in_root = Path(args.in_root)
     exp_dir = Path(args.exp_dir)
@@ -105,16 +112,53 @@ def main():
         except Exception:
             pass
     if args.deterministic:
+        # cuBLAS reproducibility requirement when deterministic algos are enabled.
+        # See: https://docs.nvidia.com/cuda/cublas/index.html#cublasApi_reproducibility
+        if args.device == "cuda" and "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
+            os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         try:
             torch.use_deterministic_algorithms(True)
         except Exception:
             pass
 
-    # For CPU benchmark, force ORT CPU + single-thread + full graph opts.
-    # (ignore args.providers here by design)
+    # ONNXRuntime session (respect --providers)
     import onnxruntime as ort
 
-    ort_sess = make_ort_session(ort, onnx_path.as_posix())
+    # Parse providers
+    providers = []
+    for p in [s.strip().lower() for s in args.providers.split(",") if s.strip()]:
+        if p == "cuda":
+            providers.append("CUDAExecutionProvider")
+        elif p == "cpu":
+            providers.append("CPUExecutionProvider")
+        else:
+            raise ValueError(f"unknown provider key: {p}")
+    if not providers:
+        providers = ["CPUExecutionProvider"]
+
+    so = ort.SessionOptions()
+    so.intra_op_num_threads = 1
+    so.inter_op_num_threads = 1
+    so.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+    so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    so.enable_cpu_mem_arena = True
+    so.enable_mem_pattern = True
+    so.enable_mem_reuse = True
+
+    # ORT TF32 control for CUDA EP (if supported by installed ORT build)
+    if "CUDAExecutionProvider" in providers:
+        try:
+            # Available in newer ORT builds; ignore if not supported.
+            so.add_session_config_entry("session.set_denormal_as_zero", "1")
+            so.add_session_config_entry("session.use_deterministic_compute", "1" if args.deterministic else "0")
+            so.add_session_config_entry(
+                "ep.cuda.allow_tf32",
+                "1" if args.ort_tf32 else "0",
+            )
+        except Exception:
+            pass
+
+    ort_sess = ort.InferenceSession(onnx_path.as_posix(), sess_options=so, providers=providers)
     ort_in = ort_sess.get_inputs()[0].name
     ort_out = ort_sess.get_outputs()[0].name
 
@@ -139,6 +183,9 @@ def main():
 
         def forward(self, waveforms: torch.Tensor) -> torch.Tensor:
             y = self.base_model(waveforms)  # (B,T,P) log_softmax
+            if args.quantize_logprobs and args.quantize_logprobs > 0:
+                q = float(args.quantize_logprobs)
+                y = torch.round(y / q) * q
             idx = torch.argmax(y, dim=-1)  # (B,T)
             return self.mapping[idx]  # (B,T,S) 0/1
 
@@ -208,7 +255,7 @@ def main():
 
     report = {
         "count": len(per_audio),
-        "onnx_providers": ["CPUExecutionProvider"],
+        "onnx_providers": providers,
         "torch_device": str(device),
         "summary": {
             "diff_abs_mean__mean": float(statistics.mean(diff_abs_all)),

@@ -103,14 +103,22 @@ class Wav2Vec2Model(Module):
                 is returned.
                 It indicates the valid length in time axis of each feature Tensor.
         """
+        # ONNX export note:
+        # `F.layer_norm(x, x.shape[-1:])` requires `normalized_shape` to be constant for ONNX.
+        # Implement waveform normalization explicitly to keep support for dynamic lengths.
+        def _layer_norm_last_dim(x: Tensor, eps: float = 1e-5) -> Tensor:
+            mean = x.mean(dim=-1, keepdim=True)
+            var = (x - mean).pow(2).mean(dim=-1, keepdim=True)  # unbiased=False
+            return (x - mean) / torch.sqrt(var + eps)
+
         if self.normalize_waveform:
             if lengths is not None:
                 waveforms = [
-                    F.layer_norm(wave[:length], (length,)) for wave, length in zip(waveforms, lengths)
+                    _layer_norm_last_dim(wave[:length]) for wave, length in zip(waveforms, lengths)
                 ]
                 waveforms = torch.nn.utils.rnn.pad_sequence(waveforms, batch_first=True)
             else:
-                waveforms = F.layer_norm(waveforms, waveforms.shape[-1:])
+                waveforms = _layer_norm_last_dim(waveforms)
 
         x, lengths = self.feature_extractor(waveforms, lengths)
         if self.feature_grad_mult != 1.0:

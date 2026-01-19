@@ -32,6 +32,20 @@ conda run --no-capture-output -n diarizen python inference/export_to_onnx.py \
   --out-onnx inference/models/kaldi_merged_1219_all_ft_base/epoch_0010_multilabel_hard.onnx
 ```
 
+#### 1.1) 导出 ONNX（kaldi_merged_1219_all_ft_large 的 epoch_0002）
+
+```bash
+# 一键脚本（推荐）
+./inference/run_export_kaldi_merged_1219_all_ft_large_epoch_0002.sh
+
+# 或者手动指定参数：
+conda run --no-capture-output -n diarizen python inference/export_to_onnx.py \
+  --exp-dir /root/code/github_repos/DiariZen/recipes/diar_ssl/exp/kaldi_merged_1219_all_ft_large \
+  --config /root/code/github_repos/DiariZen/recipes/diar_ssl/exp/kaldi_merged_1219_all_ft_large/config__2025_12_26--11_44_15.toml \
+  --ckpt-name epoch_0002 \
+  --out-onnx inference/models/kaldi_merged_1219_all_ft_large/epoch_0002_multilabel_hard.onnx
+```
+
 #### 2) 纯 ONNX 推理（输出 RTTM）
 
 ```bash
@@ -53,6 +67,27 @@ conda run --no-capture-output -n diarizen python inference/benchmark_pytorch_vs_
   --device cuda \
   --max-files 50
 ```
+
+#### 4) PyTorch vs ONNX 精度对比（DER/JER…，需要 reference RTTM）
+
+这个评测会：
+- 用 PyTorch checkpoint 和 ONNX 在同一批音频上生成 RTTM
+- 使用仓库内置 `dscore` 对系统 RTTM 与 reference RTTM 进行打分
+- 输出 `report.json`（包含 overall/per-file 的 DER/JER/B3/NMI…）
+
+```bash
+conda run --no-capture-output -n diarizen python inference/compare_pytorch_vs_onnx_accuracy.py \
+  /path/to/audios \
+  --ref-rttm-dir /path/to/reference_rttm_dir \
+  --exp-dir /root/code/github_repos/DiariZen/recipes/diar_ssl/exp/kaldi_merged_1219_all_ft_large \
+  --config /root/code/github_repos/DiariZen/recipes/diar_ssl/exp/kaldi_merged_1219_all_ft_large/config__2025_12_26--11_44_15.toml \
+  --ckpt-name epoch_0002 \
+  --onnx inference/models/kaldi_merged_1219_all_ft_large/epoch_0002_multilabel_hard.onnx \
+  --out-dir /tmp/diar_pytorch_vs_onnx_acc_epoch_0002
+```
+
+如果你的 reference RTTM 的 `file_id` 是音频文件名（不带扩展名），保持默认 `--session-id stem` 即可；
+如果 reference RTTM 使用的是 DiariZen 常见的 `relative_path__style`，则加 `--session-id relative`。
 
 #### 备注：如何做到 PyTorch vs ONNX **严格 0 差异**
 
