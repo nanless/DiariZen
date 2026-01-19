@@ -18,13 +18,39 @@ conda run --no-capture-output -n diarizen python inference/simple_diarize_onnx.p
 from __future__ import annotations
 
 import argparse
+import ctypes
+import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 from inference.cpu_runtime import configure_env_single_thread
 
 # Must happen before importing numpy/onnxruntime/matplotlib (OpenMP/BLAS stacks)
 configure_env_single_thread()
+
+def _preload_conda_libstdcxx() -> None:
+    """
+    Workaround for runtime error:
+      /usr/lib/.../libstdc++.so.6: version `GLIBCXX_3.4.29' not found
+
+    Some wheels (e.g. Pillow -> libLerc) require a newer libstdc++ than the system one.
+    When the dynamic loader resolves libstdc++ from /usr/lib first, importing PIL/matplotlib
+    may fail. Preloading conda's libstdc++ with RTLD_GLOBAL usually fixes it.
+    """
+    prefix = Path(sys.prefix)
+    candidates = [
+        prefix / "lib" / "libstdc++.so.6",
+        prefix / "x86_64-conda-linux-gnu" / "lib" / "libstdc++.so.6",
+    ]
+    for p in candidates:
+        if p.is_file():
+            try:
+                ctypes.CDLL(p.as_posix(), mode=ctypes.RTLD_GLOBAL)
+                return
+            except Exception:
+                # If preload fails, we'll fall back to non-plot behavior later.
+                return
 
 
 def plot_diarization(
@@ -33,14 +59,17 @@ def plot_diarization(
     duration: float,
     session_name: str,
     output_path: str,
-):
+    output_format: str = "png",
+) -> Optional[str]:
     try:
+        _preload_conda_libstdcxx()
         import matplotlib
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import numpy as np
         import soundfile as sf
+        from pathlib import Path as _Path
 
         data, sr = sf.read(audio_path)
         if data.ndim > 1:
@@ -86,10 +115,26 @@ def plot_diarization(
         ax_diar.grid(True, axis="x", linestyle="--", alpha=0.3)
 
         fig.tight_layout()
-        fig.savefig(output_path, dpi=150)
+        out_path = _Path(output_path)
+        fmt = output_format.lower().strip()
+        # Prefer requested format, but if PNG fails (PIL/libstdc++ mismatch),
+        # fallback to SVG which does not require Pillow.
+        try:
+            if fmt == "svg":
+                out_path = out_path.with_suffix(".svg")
+                fig.savefig(out_path.as_posix(), format="svg")
+            else:
+                out_path = out_path.with_suffix(".png")
+                fig.savefig(out_path.as_posix(), dpi=150)
+        except Exception as e:
+            out_path = out_path.with_suffix(".svg")
+            fig.savefig(out_path.as_posix(), format="svg")
+            print(f"plot: png failed ({e}); wrote svg instead: {out_path}")
         plt.close(fig)
+        return out_path.as_posix()
     except Exception as e:
         print(f"plot failed: {e}")
+        return None
 
 
 def _providers_from_arg(arg: str):
@@ -123,6 +168,13 @@ def main():
     parser.add_argument("--max-files", type=int, default=0, help="If >0, only process first N files")
     parser.add_argument("--plot", action="store_true", default=True, help="Generate visualization PNG")
     parser.add_argument("--no-plot", action="store_false", dest="plot", help="Disable visualization PNG")
+    parser.add_argument(
+        "--plot-format",
+        type=str,
+        default="png",
+        choices=["png", "svg"],
+        help="Plot output format. Use svg to avoid Pillow/libstdc++ issues.",
+    )
     args = parser.parse_args()
 
     import numpy as np
@@ -179,8 +231,16 @@ def main():
 
         plot_path = None
         if args.plot:
-            plot_path = out_dir / f"{sess_name}.png"
-            plot_diarization(audio_path, segments, duration, sess_name, plot_path.as_posix())
+            plot_path = out_dir / f"{sess_name}.{args.plot_format}"
+            actual = plot_diarization(
+                audio_path,
+                segments,
+                duration,
+                sess_name,
+                plot_path.as_posix(),
+                output_format=args.plot_format,
+            )
+            plot_path = Path(actual) if actual else None
 
         summary.append(
             {

@@ -56,6 +56,14 @@ fi
 
 mkdir -p "$OUT_DIR"
 
+# Fix common Pillow/libstdc++ mismatch (GLIBCXX_3.4.29 not found) by preloading conda's libstdc++.
+# This makes matplotlib/PIL PNG saving work on older system images.
+DIARIZEN_PREFIX="$(conda run -n diarizen python -c "import sys; print(sys.prefix)")"
+if [[ -f "$DIARIZEN_PREFIX/lib/libstdc++.so.6" ]]; then
+  export LD_PRELOAD="$DIARIZEN_PREFIX/lib/libstdc++.so.6${LD_PRELOAD:+:$LD_PRELOAD}"
+  export LD_LIBRARY_PATH="$DIARIZEN_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+
 # 使用 conda run 执行 ONNX 推理
 conda run --no-capture-output -n diarizen python "$REPO_DIR/inference/simple_diarize_onnx.py" \
   "$IN_ROOT" \
