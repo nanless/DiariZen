@@ -38,7 +38,7 @@ lr = 5e-6
 [optimizer_big]
 path = "torch.optim.AdamW"
 [optimizer_big.args]
-lr = 1e-4
+lr = 5e-5
 # optimizer_big 用于上层头部，学习率相对更大
 
 [model]
