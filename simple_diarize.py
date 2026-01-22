@@ -11,7 +11,8 @@ python simple_diarize.py \
   /path/to/audios \
   --ckpt-dir /path/to/checkpoints/epoch_0004 \
   --config /path/to/config.toml \
-  --out-dir /path/to/output
+  --out-dir /path/to/output \
+  --num-workers 8
 """
 
 from inference.cpu_runtime import configure_env_single_thread
@@ -21,8 +22,9 @@ configure_env_single_thread()
 
 import argparse
 import json
+import multiprocessing as mp
 from pathlib import Path
-from typing import List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -37,7 +39,12 @@ from inference.cpu_runtime import configure_torch_single_thread
 
 
 def list_audio_files(root_dir: str) -> List[str]:
-    """递归扫描目录，列出所有音频文件"""
+    """递归扫描目录，列出所有音频文件（也支持单文件路径）。"""
+    p = Path(root_dir)
+    if p.is_file():
+        if p.stat().st_size > 1024:
+            return [str(p)]
+        return []
     exts = ["*.wav", "*.mp3", "*.m4a", "*.flac", "*.ogg", "*.aac", "*.wma"]
     files = set()
     for ext in exts:
@@ -198,6 +205,187 @@ def plot_diarization(
         print(f"绘图失败: {e}")
 
 
+def load_model(
+    *,
+    config_path: Path,
+    ckpt_dir: Path,
+    device: torch.device,
+) -> torch.nn.Module:
+    """加载模型与 checkpoint（返回 eval() 模型）。"""
+    print(f"加载配置: {config_path}")
+    config = toml.load(config_path)
+
+    print(f"加载模型: {ckpt_dir}")
+    model_args = config["model"]["args"].copy()
+    model = instantiate(config["model"]["path"], args=model_args)
+
+    ckpt_path = ckpt_dir / "pytorch_model.bin"
+    state_dict = torch.load(ckpt_path, map_location="cpu")
+    model.load_state_dict(state_dict)
+    model = model.to(device)
+    model.eval()
+
+    print(f"模型参数量: {sum(p.numel() for p in model.parameters()) / 1e6:.2f}M")
+
+    # 触发并打印模型感受野信息
+    model_num_frames, model_rf_duration, model_rf_step = model.get_rf_info
+    print(f"模型感受野: duration={model_rf_duration:.3f}s, step={model_rf_step:.3f}s, num_frames={model_num_frames}")
+
+    return model
+
+
+def diarize_one(
+    *,
+    audio_path: str,
+    in_root: Path,
+    out_dir: Path,
+    model: torch.nn.Module,
+    device: torch.device,
+    sample_rate: int,
+    min_duration: float,
+    plot: bool,
+) -> Dict[str, Any]:
+    """处理单个音频文件，输出 RTTM/PNG，并返回 summary 记录。"""
+    # 生成会话名称
+    rel = Path(audio_path).relative_to(in_root)
+    sess_name = rel.with_suffix("").as_posix().replace("/", "__")
+
+    print(f"\n处理: {sess_name}")
+
+    # 加载音频
+    audio_data, duration = load_audio(audio_path, sample_rate)
+    print(f"  时长: {duration:.2f}s")
+
+    # 准备输入
+    x = torch.from_numpy(audio_data).float().unsqueeze(0).to(device)  # (1, channels, samples)
+
+    # 推理
+    with torch.inference_mode():
+        y_pred = model(x)  # (1, num_frames, num_classes)
+
+    print(f"  预测形状: {y_pred.shape}")
+
+    # 转换为 multilabel
+    if hasattr(model, "specifications") and hasattr(model.specifications, "powerset") and model.specifications.powerset:
+        # Powerset模式：转换为multilabel
+        print("  使用powerset模式")
+        multilabel = model.powerset.to_multilabel(y_pred)  # (1, num_frames, max_speakers)
+    else:
+        # 已经是multilabel - 使用sigmoid激活
+        print("  使用multilabel模式")
+        multilabel = torch.sigmoid(y_pred)
+
+    frame_labels = multilabel[0].cpu().numpy()  # (num_frames, max_speakers)
+    frame_labels = (frame_labels > 0.5).astype(np.uint8)
+
+    print(f"  帧标签形状: {frame_labels.shape}")
+
+    # 移除全零的说话人
+    active_speakers = frame_labels.sum(axis=0) > 0
+    frame_labels = frame_labels[:, active_speakers]
+
+    num_speakers = frame_labels.shape[1]
+    print(f"  检测到说话人数: {num_speakers}")
+
+    # 使用模型步长
+    _, _, model_rf_step = model.get_rf_info
+
+    segments = frames_to_segments(
+        frame_labels,
+        frame_step=model_rf_step,
+        min_duration=min_duration,
+    )
+
+    print(f"  生成段数: {len(segments)}")
+
+    rttm_path = out_dir / f"{sess_name}.rttm"
+    write_rttm(segments, sess_name, str(rttm_path))
+    print(f"  RTTM: {rttm_path}")
+
+    plot_path: Optional[Path] = None
+    if plot:
+        plot_path = out_dir / f"{sess_name}.png"
+        plot_diarization(audio_path, segments, duration, sess_name, str(plot_path))
+        print(f"  图表: {plot_path}")
+
+    return {
+        "audio": audio_path,
+        "session": sess_name,
+        "duration": duration,
+        "num_speakers": int(num_speakers),
+        "num_segments": len(segments),
+        "rttm": str(rttm_path),
+        "plot": str(plot_path) if plot_path else None,
+    }
+
+
+# ---- multiprocessing worker globals ----
+_W_IN_ROOT: Optional[Path] = None
+_W_OUT_DIR: Optional[Path] = None
+_W_DEVICE: Optional[torch.device] = None
+_W_MODEL: Optional[torch.nn.Module] = None
+_W_SAMPLE_RATE: int = 16000
+_W_MIN_DURATION: float = 0.0
+_W_PLOT: bool = True
+
+
+def _mp_init_worker(
+    in_root: str,
+    out_dir: str,
+    ckpt_dir: str,
+    config_path: str,
+    device: str,
+    sample_rate: int,
+    min_duration: float,
+    plot: bool,
+):
+    """每个 worker 进程初始化：设置 torch 单线程 + 加载模型到全局。"""
+    global _W_IN_ROOT, _W_OUT_DIR, _W_DEVICE, _W_MODEL, _W_SAMPLE_RATE, _W_MIN_DURATION, _W_PLOT
+
+    # 每个进程强制单线程（避免 oversubscription）
+    configure_torch_single_thread(torch)
+
+    _W_IN_ROOT = Path(in_root)
+    _W_OUT_DIR = Path(out_dir)
+    _W_SAMPLE_RATE = int(sample_rate)
+    _W_MIN_DURATION = float(min_duration)
+    _W_PLOT = bool(plot)
+
+    if device == "cuda" and torch.cuda.is_available():
+        _W_DEVICE = torch.device("cuda")
+    else:
+        _W_DEVICE = torch.device("cpu")
+
+    _W_MODEL = load_model(config_path=Path(config_path), ckpt_dir=Path(ckpt_dir), device=_W_DEVICE)
+
+
+def _mp_process_one(audio_path: str) -> Dict[str, Any]:
+    """worker 处理单条任务（必须是顶层函数才能被 pickle）。"""
+    assert _W_IN_ROOT is not None
+    assert _W_OUT_DIR is not None
+    assert _W_DEVICE is not None
+    assert _W_MODEL is not None
+    return diarize_one(
+        audio_path=audio_path,
+        in_root=_W_IN_ROOT,
+        out_dir=_W_OUT_DIR,
+        model=_W_MODEL,
+        device=_W_DEVICE,
+        sample_rate=_W_SAMPLE_RATE,
+        min_duration=_W_MIN_DURATION,
+        plot=_W_PLOT,
+    )
+
+
+def _mp_process_one_safe(audio_path: str) -> Dict[str, Any]:
+    """worker 包一层异常捕获，避免整池崩溃。"""
+    try:
+        return _mp_process_one(audio_path)
+    except Exception as e:
+        # 不抛异常，返回错误信息，主进程汇总时可见
+        return {"audio": audio_path, "error": repr(e)}
+
+
 def main():
     parser = argparse.ArgumentParser(description="简洁的说话人分离推理脚本")
     
@@ -212,6 +400,7 @@ def main():
     parser.add_argument("--min-duration", type=float, default=0.0, help="最小段持续时间（秒）")
     parser.add_argument("--plot", action="store_true", default=True, help="生成可视化")
     parser.add_argument("--no-plot", action="store_false", dest="plot", help="关闭可视化")
+    parser.add_argument("--num-workers", type=int, default=1, help="并发进程数（>1 时多进程并发处理多个音频；CUDA 下建议保持 1）")
     
     args = parser.parse_args()
 
@@ -225,10 +414,6 @@ def main():
     config_path = Path(args.config)
     
     out_dir.mkdir(parents=True, exist_ok=True)
-    
-    # 加载配置
-    print(f"加载配置: {config_path}")
-    config = toml.load(config_path)
     
     # 设备
     if args.device == "cuda":
@@ -249,25 +434,6 @@ def main():
     
     print(f"使用设备: {device}")
     
-    # 实例化模型
-    print(f"加载模型: {ckpt_dir}")
-    model_args = config["model"]["args"].copy()
-    
-    model = instantiate(config["model"]["path"], args=model_args)
-    
-    # 加载checkpoint
-    ckpt_path = ckpt_dir / "pytorch_model.bin"
-    state_dict = torch.load(ckpt_path, map_location="cpu")
-    model.load_state_dict(state_dict)
-    model = model.to(device)
-    model.eval()
-    
-    print(f"模型参数量: {sum(p.numel() for p in model.parameters()) / 1e6:.2f}M")
-    
-    # 获取模型感受野信息
-    model_num_frames, model_rf_duration, model_rf_step = model.get_rf_info
-    print(f"模型感受野: duration={model_rf_duration:.3f}s, step={model_rf_step:.3f}s, num_frames={model_num_frames}")
-    
     # 扫描音频文件
     audios = list_audio_files(str(in_root))
     if not audios:
@@ -275,84 +441,52 @@ def main():
         return
     print(f"找到 {len(audios)} 个音频文件")
     
-    # 处理每个音频
-    summary = []
-    
-    for audio_path in audios:
-        # 生成会话名称
-        rel = Path(audio_path).relative_to(in_root)
-        sess_name = rel.with_suffix("").as_posix().replace("/", "__")
-        
-        print(f"\n处理: {sess_name}")
-        
-        # 加载音频
-        audio_data, duration = load_audio(audio_path, args.sample_rate)
-        print(f"  时长: {duration:.2f}s")
-        
-        # 准备输入
-        x = torch.from_numpy(audio_data).float().unsqueeze(0).to(device)  # (1, channels, samples)
-        
-        # 推理
-        with torch.inference_mode():
-            y_pred = model(x)  # (1, num_frames, num_classes)
-        
-        print(f"  预测形状: {y_pred.shape}")
-        
-        # 转换为multilabel
-        if hasattr(model, 'specifications') and hasattr(model.specifications, 'powerset') and model.specifications.powerset:
-            # Powerset模式：转换为multilabel
-            print(f"  使用powerset模式")
-            # model.powerset 是 Powerset 对象，而 model.specifications.powerset 是布尔值
-            multilabel = model.powerset.to_multilabel(y_pred)  # (1, num_frames, max_speakers)
-        else:
-            # 已经是multilabel - 使用sigmoid激活
-            print(f"  使用multilabel模式")
-            multilabel = torch.sigmoid(y_pred)
-        
-        # 转换为numpy
-        frame_labels = multilabel[0].cpu().numpy()  # (num_frames, max_speakers)
-        frame_labels = (frame_labels > 0.5).astype(np.uint8)  # 二值化
-        
-        print(f"  帧标签形状: {frame_labels.shape}")
-        
-        # 移除全零的说话人
-        active_speakers = frame_labels.sum(axis=0) > 0
-        frame_labels = frame_labels[:, active_speakers]
-        
-        num_speakers = frame_labels.shape[1]
-        print(f"  检测到说话人数: {num_speakers}")
-        
-        # 转换为时间段
-        segments = frames_to_segments(
-            frame_labels,
-            frame_step=model_rf_step,
-            min_duration=args.min_duration,
-        )
-        
-        print(f"  生成段数: {len(segments)}")
-        
-        # 写RTTM
-        rttm_path = out_dir / f"{sess_name}.rttm"
-        write_rttm(segments, sess_name, str(rttm_path))
-        print(f"  RTTM: {rttm_path}")
-        
-        # 画图
-        plot_path = None
-        if args.plot:
-            plot_path = out_dir / f"{sess_name}.png"
-            plot_diarization(audio_path, segments, duration, sess_name, str(plot_path))
-            print(f"  图表: {plot_path}")
-        
-        # 记录
-        summary.append({
-            "audio": audio_path,
-            "session": sess_name,
-            "duration": duration,
-            "num_speakers": int(num_speakers),
-            "num_segments": len(segments),
-            "rttm": str(rttm_path),
-            "plot": str(plot_path) if plot_path else None,
-        })
+    if args.device == "cuda" and args.num_workers and args.num_workers > 1:
+        print("检测到 device=cuda 且 num-workers>1。为避免多进程重复占用 GPU，自动改为 num-workers=1。")
+        args.num_workers = 1
+
+    summary: List[Dict[str, Any]] = []
+
+    if args.num_workers <= 1:
+        # 单进程：只加载一次模型
+        model = load_model(config_path=config_path, ckpt_dir=ckpt_dir, device=device)
+        for audio_path in audios:
+            summary.append(
+                diarize_one(
+                    audio_path=audio_path,
+                    in_root=in_root,
+                    out_dir=out_dir,
+                    model=model,
+                    device=device,
+                    sample_rate=args.sample_rate,
+                    min_duration=args.min_duration,
+                    plot=args.plot,
+                )
+            )
+    else:
+        # 多进程：每个 worker 加载一次模型，然后并行处理多个音频
+        ctx = mp.get_context("spawn")
+        print(f"使用多进程并发: num_workers={args.num_workers} (start_method=spawn)")
+
+        with ctx.Pool(
+            processes=args.num_workers,
+            initializer=_mp_init_worker,
+            initargs=(
+                str(in_root),
+                str(out_dir),
+                str(ckpt_dir),
+                str(config_path),
+                str(args.device),
+                int(args.sample_rate),
+                float(args.min_duration),
+                bool(args.plot),
+            ),
+        ) as pool:
+            for item in pool.imap_unordered(_mp_process_one_safe, audios, chunksize=1):
+                summary.append(item)
+        # 输出稳定：按输入顺序排序（imap_unordered 会乱序）
+        order = {p: i for i, p in enumerate(audios)}
+        summary.sort(key=lambda x: order.get(x.get("audio", ""), 1 << 30))
     
     # 写汇总
     summary_path = out_dir / "summary.json"

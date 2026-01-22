@@ -22,6 +22,9 @@ CONFIG_PATH="$EXP_DIR/config__2026_01_09--00_41_09.toml"
 IN_ROOT="${IN_ROOT:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios}"
 OUT_BASE_DIR="${OUT_BASE_DIR:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios_Diarizen_simple_base_1219_all}"
 
+# 并发进程数（CPU 推理时可适当提高；CUDA 下建议保持 1）
+NUM_WORKERS="${NUM_WORKERS:-16}"
+
 echo "=========================================="
 echo "开始批量运行 simple_diarize.py"
 echo "=========================================="
@@ -79,7 +82,8 @@ for epoch in $EPOCHS; do
         --ckpt-dir "$ckpt_dir" \
         --config "$CONFIG_PATH" \
         --out-dir "$out_dir" \
-        --device cuda
+        --device cpu \
+        --num-workers "$NUM_WORKERS"
         
     if [[ $? -eq 0 ]]; then
         echo "✓ $epoch 处理完成"
