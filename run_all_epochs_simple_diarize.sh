@@ -13,14 +13,14 @@ REPO_DIR="$SCRIPT_DIR"
 export PYTHONPATH="$REPO_DIR/pyannote-audio:$REPO_DIR:$PYTHONPATH"
 
 # 配置参数
-EXP_NAME="kaldi_merged_1219_all_ft_base"
+EXP_NAME="kaldi_merged_1219_all_ft_large"
 EXP_DIR="$REPO_DIR/recipes/diar_ssl/exp/$EXP_NAME"
 CHECKPOINTS_DIR="$EXP_DIR/checkpoints"
-CONFIG_PATH="$EXP_DIR/config__2026_01_09--00_41_09.toml"
+CONFIG_PATH="$EXP_DIR/config__2026_01_20--18_03_58.toml"
 
 # 输入和输出目录（根据需要修改或通过环境变量传入）
 IN_ROOT="${IN_ROOT:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios}"
-OUT_BASE_DIR="${OUT_BASE_DIR:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios_Diarizen_simple_base_1219_all}"
+OUT_BASE_DIR="${OUT_BASE_DIR:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios_Diarizen_simple_large_1219_all}"
 
 # 并发进程数（CPU 推理时可适当提高；CUDA 下建议保持 1）
 NUM_WORKERS="${NUM_WORKERS:-16}"
