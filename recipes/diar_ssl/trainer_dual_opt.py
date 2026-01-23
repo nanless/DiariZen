@@ -18,6 +18,12 @@ class Trainer(BaseTrainer):
         super().__init__(*args, **kwargs)
         self.accelerator.print(self.model)
         
+        # Log learning rates from config for debugging
+        if self.accelerator.is_local_main_process:
+            config_lr_small = self.config.get("optimizer_small", {}).get("args", {}).get("lr", None)
+            config_lr_big = self.config.get("optimizer_big", {}).get("args", {}).get("lr", None)
+            logger.info(f"Learning rates from config: optimizer_small={config_lr_small}, optimizer_big={config_lr_big}")
+        
         # auto GN
         self.grad_history = []
 
@@ -150,6 +156,63 @@ class Trainer(BaseTrainer):
             val_Confusion = torch.zeros_like(val_metrics['DiarizationErrorRate/Confusion'])
 
         return {"Loss": loss, "DER": val_DER, "FA": val_FA, "Miss": val_Miss, "Confusion": val_Confusion}
+
+    def _load_checkpoint(self, ckpt_path):
+        """Override _load_checkpoint to update learning rates from config after loading checkpoint.
+        
+        This allows resuming training with new learning rates specified in the config file,
+        even though the checkpoint contains the old learning rates.
+        """
+        # Call parent method to load checkpoint (this will restore optimizer state including old LR)
+        super()._load_checkpoint(ckpt_path)
+        
+        # After loading checkpoint, update learning rates from config
+        # This allows resuming with new learning rates even if checkpoint has old ones
+        config_lr_small = self.config.get("optimizer_small", {}).get("args", {}).get("lr", None)
+        config_lr_big = self.config.get("optimizer_big", {}).get("args", {}).get("lr", None)
+        
+        # Update optimizer_small learning rate
+        if config_lr_small is not None:
+            current_lr_small = self.optimizer_small.param_groups[0]["lr"]
+            # Always update to config value, regardless of current value
+            # This ensures we use the learning rate from config file
+            for param_group in self.optimizer_small.param_groups:
+                param_group["lr"] = config_lr_small
+            
+            if self.accelerator.is_local_main_process:
+                if abs(current_lr_small - config_lr_small) > 1e-10:
+                    logger.info(f"✓ Updated optimizer_small learning rate: {current_lr_small:.2e} → {config_lr_small:.2e}")
+                else:
+                    logger.info(f"✓ optimizer_small learning rate already set to: {config_lr_small:.2e}")
+        
+        # Update optimizer_big learning rate
+        if config_lr_big is not None:
+            current_lr_big = self.optimizer_big.param_groups[0]["lr"]
+            # Always update to config value, regardless of current value
+            for param_group in self.optimizer_big.param_groups:
+                param_group["lr"] = config_lr_big
+            
+            if self.accelerator.is_local_main_process:
+                if abs(current_lr_big - config_lr_big) > 1e-10:
+                    logger.info(f"✓ Updated optimizer_big learning rate: {current_lr_big:.2e} → {config_lr_big:.2e}")
+                else:
+                    logger.info(f"✓ optimizer_big learning rate already set to: {config_lr_big:.2e}")
+        
+        # Verify the update worked
+        if self.accelerator.is_local_main_process:
+            if config_lr_small is not None:
+                actual_lr_small = self.optimizer_small.param_groups[0]["lr"]
+                if abs(actual_lr_small - config_lr_small) > 1e-10:
+                    logger.error(f"✗ Failed to update optimizer_small LR! Expected {config_lr_small:.2e}, got {actual_lr_small:.2e}")
+                else:
+                    logger.info(f"✓ Verified optimizer_small LR: {actual_lr_small:.2e}")
+            
+            if config_lr_big is not None:
+                actual_lr_big = self.optimizer_big.param_groups[0]["lr"]
+                if abs(actual_lr_big - config_lr_big) > 1e-10:
+                    logger.error(f"✗ Failed to update optimizer_big LR! Expected {config_lr_big:.2e}, got {actual_lr_big:.2e}")
+                else:
+                    logger.info(f"✓ Verified optimizer_big LR: {actual_lr_big:.2e}")
 
     def validation_epoch_end(self, validation_epoch_output):
         metric_keys = validation_epoch_output[0].keys()
