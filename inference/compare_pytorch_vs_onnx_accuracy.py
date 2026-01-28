@@ -17,8 +17,10 @@ Note:
 from __future__ import annotations
 
 import argparse
+import ctypes
 import json
 import sys
+import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -27,8 +29,27 @@ import toml
 
 from inference.cpu_runtime import configure_env_single_thread
 
+
 # Must happen before importing numpy/torch/onnxruntime (OpenMP/BLAS stacks)
 configure_env_single_thread()
+
+
+def _preload_conda_libstdcxx() -> None:
+    prefix = Path(sys.prefix)
+    candidates = [
+        prefix / "lib" / "libstdc++.so.6",
+        prefix / "x86_64-conda-linux-gnu" / "lib" / "libstdc++.so.6",
+    ]
+    for p in candidates:
+        if p.is_file():
+            try:
+                ctypes.CDLL(p.as_posix(), mode=ctypes.RTLD_GLOBAL)
+            except Exception:
+                pass
+            return
+
+
+_preload_conda_libstdcxx()
 
 
 @dataclass(frozen=True)
@@ -108,48 +129,78 @@ def _score_with_dscore(
     ignore_overlaps: bool,
     step: float,
 ) -> Tuple[Dict[str, dict], dict]:
-    # dscore isn't a normal installed package; add repo's dscore/ to sys.path.
-    repo_root = Path(__file__).resolve().parents[1]
-    sys.path.insert(0, (repo_root / "dscore").as_posix())
+    def sanitize_rttm(in_path: Path, out_path: Path) -> None:
+        lines_out: List[str] = []
+        for line in in_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            s = line.strip()
+            if not s:
+                continue
+            parts = s.split()
+            if len(parts) < 5:
+                continue
+            try:
+                start = float(parts[3])
+                dur = float(parts[4])
+            except Exception:
+                continue
+            if not (dur > 0.0 and start >= 0.0):
+                continue
+            lines_out.append(s)
+        out_path.write_text("\n".join(lines_out) + ("\n" if lines_out else ""), encoding="utf-8")
 
-    from scorelib.rttm import load_rttm  # type: ignore
-    from scorelib.score import score  # type: ignore
-    from scorelib.turn import merge_turns, trim_turns  # type: ignore
-    from scorelib.uem import gen_uem, load_uem  # type: ignore
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        ref_clean = []
+        for i, p in enumerate(ref_rttms):
+            out_p = tmp_dir / f"ref_{i:06d}.rttm"
+            sanitize_rttm(p, out_p)
+            ref_clean.append(out_p)
+        sys_clean = []
+        for i, p in enumerate(sys_rttms):
+            out_p = tmp_dir / f"sys_{i:06d}.rttm"
+            sanitize_rttm(p, out_p)
+            sys_clean.append(out_p)
 
-    ref_turns = []
-    for p in ref_rttms:
-        turns, _, _ = load_rttm(p.as_posix())
-        ref_turns.extend(turns)
-    sys_turns = []
-    for p in sys_rttms:
-        turns, _, _ = load_rttm(p.as_posix())
-        sys_turns.extend(turns)
+        repo_root = Path(__file__).resolve().parents[1]
+        sys.path.insert(0, (repo_root / "dscore").as_posix())
 
-    if uem is not None:
-        assert uem.is_file(), f"uem not found: {uem}"
-        uem_obj = load_uem(uem.as_posix())
-    else:
-        uem_obj = gen_uem(ref_turns, sys_turns)
+        from scorelib.rttm import load_rttm  # type: ignore
+        from scorelib.score import score  # type: ignore
+        from scorelib.turn import merge_turns, trim_turns  # type: ignore
+        from scorelib.uem import gen_uem, load_uem  # type: ignore
 
-    # Mirror dscore/score.py behavior: trim + merge overlaps.
-    ref_turns = trim_turns(ref_turns, uem_obj)
-    sys_turns = trim_turns(sys_turns, uem_obj)
-    ref_turns = merge_turns(ref_turns)
-    sys_turns = merge_turns(sys_turns)
+        ref_turns = []
+        for p in ref_clean:
+            turns, _, _ = load_rttm(p.as_posix())
+            ref_turns.extend(turns)
+        sys_turns = []
+        for p in sys_clean:
+            turns, _, _ = load_rttm(p.as_posix())
+            sys_turns.extend(turns)
 
-    file_scores, global_scores = score(
-        ref_turns,
-        sys_turns,
-        uem_obj,
-        step=step,
-        collar=collar,
-        ignore_overlaps=ignore_overlaps,
-    )
+        if uem is not None:
+            assert uem.is_file(), f"uem not found: {uem}"
+            uem_obj = load_uem(uem.as_posix())
+        else:
+            uem_obj = gen_uem(ref_turns, sys_turns)
 
-    per_file = {s.file_id: s._asdict() for s in file_scores}
-    overall = global_scores._asdict()
-    return per_file, overall
+        ref_turns = trim_turns(ref_turns, uem_obj)
+        sys_turns = trim_turns(sys_turns, uem_obj)
+        ref_turns = merge_turns(ref_turns)
+        sys_turns = merge_turns(sys_turns)
+
+        file_scores, global_scores = score(
+            ref_turns,
+            sys_turns,
+            uem_obj,
+            step=step,
+            collar=collar,
+            ignore_overlaps=ignore_overlaps,
+        )
+
+        per_file = {s.file_id: s._asdict() for s in file_scores}
+        overall = global_scores._asdict()
+        return per_file, overall
 
 
 def main() -> None:
@@ -199,10 +250,8 @@ def main() -> None:
     import torch
 
     from diarizen.utils import instantiate
-    from inference.cpu_runtime import configure_torch_single_thread
+    from inference.cpu_runtime import configure_torch_single_thread, make_ort_session
     from inference.utils import frames_to_segments, list_audio_files, load_audio_mono_16k, write_rttm
-
-    from inference.cpu_runtime import make_ort_session
 
     in_root = Path(args.in_root)
     exp_dir = Path(args.exp_dir)
@@ -285,8 +334,9 @@ def main() -> None:
 
     # ONNX session
     providers = _providers_from_arg(args.providers)
-    sess_opts = ort.SessionOptions()
-    sess = ort.InferenceSession(onnx_path.as_posix(), sess_options=sess_opts, providers=providers)
+    if providers != ["CPUExecutionProvider"]:
+        raise ValueError("onnx 只允许 cpu provider（--providers cpu）")
+    sess = make_ort_session(ort, onnx_path.as_posix())
     ort_in = sess.get_inputs()[0].name
     ort_out = sess.get_outputs()[0].name
 
@@ -380,4 +430,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

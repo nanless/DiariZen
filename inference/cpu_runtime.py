@@ -51,7 +51,7 @@ def configure_torch_single_thread(torch_module) -> None:
         pass
 
 
-def make_ort_session(onnxruntime_module, onnx_path: str):
+def make_ort_session(onnxruntime_module, onnx_path: str, providers=None):
     # onnxruntime_module is imported onnxruntime as ort
     so = onnxruntime_module.SessionOptions()
     so.intra_op_num_threads = 1
@@ -61,10 +61,10 @@ def make_ort_session(onnxruntime_module, onnx_path: str):
     so.enable_cpu_mem_arena = True
     so.enable_mem_pattern = True
     so.enable_mem_reuse = True
-    # Force CPU provider only for consistent CPU benchmarking.
+    if providers is None:
+        providers = ["CPUExecutionProvider"]
     return onnxruntime_module.InferenceSession(
         onnx_path,
         sess_options=so,
-        providers=["CPUExecutionProvider"],
+        providers=providers,
     )
-

@@ -26,6 +26,7 @@ from typing import Optional
 
 from inference.cpu_runtime import configure_env_single_thread
 
+
 # Must happen before importing numpy/onnxruntime/matplotlib (OpenMP/BLAS stacks)
 configure_env_single_thread()
 
@@ -63,20 +64,21 @@ def plot_diarization(
 ) -> Optional[str]:
     try:
         _preload_conda_libstdcxx()
+        from pathlib import Path as _Path
+
         import matplotlib
+        import numpy as np
+        import soundfile as sf
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        import numpy as np
-        import soundfile as sf
-        from pathlib import Path as _Path
 
         data, sr = sf.read(audio_path)
         if data.ndim > 1:
             data = data.mean(axis=1)
         t = np.linspace(0, len(data) / sr, len(data))
 
-        speakers = sorted(set(spk for _, _, spk in segments))
+        speakers = sorted({spk for _, _, spk in segments})
         colors = plt.cm.get_cmap("tab20", max(len(speakers), 1))
         spk_color = {spk: colors(i) for i, spk in enumerate(speakers)}
         spk_pos = {spk: idx for idx, spk in enumerate(speakers)}
@@ -191,7 +193,9 @@ def main():
     assert onnx_path.is_file(), f"onnx not found: {onnx_path}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Force CPU single-thread session regardless of args.providers (by request)
+    providers = _providers_from_arg(args.providers)
+    if providers != ["CPUExecutionProvider"]:
+        raise ValueError("onnx 只允许 cpu provider（CPUExecutionProvider）")
     sess = make_ort_session(ort, onnx_path.as_posix())
     input_name = sess.get_inputs()[0].name
     output_name = sess.get_outputs()[0].name
@@ -260,4 +264,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

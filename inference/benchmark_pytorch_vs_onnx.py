@@ -19,10 +19,9 @@ from typing import Dict, List
 import toml
 
 from diarizen.utils import instantiate
-
+from inference.cpu_runtime import configure_env_single_thread
 from inference.utils import dump_json, list_audio_files, load_audio_mono_16k
 
-from inference.cpu_runtime import configure_env_single_thread
 
 # Must happen before importing numpy/torch/onnxruntime
 configure_env_single_thread()
@@ -44,8 +43,8 @@ def main():
     parser.add_argument("--ckpt-name", type=str, required=True, help="best or epoch_0010")
     parser.add_argument("--onnx", type=str, required=True, help="ONNX path exported by export_to_onnx.py")
     parser.add_argument("--out-json", type=str, default="", help="Output JSON report path (optional)")
-    parser.add_argument("--device", type=str, default="cuda", choices=["cuda", "cpu"], help="Torch device")
-    parser.add_argument("--providers", type=str, default="cuda,cpu", help="Comma-separated: cuda,cpu")
+    parser.add_argument("--device", type=str, default="cpu", choices=["cuda", "cpu"], help="Torch device")
+    parser.add_argument("--providers", type=str, default="cpu", help="Comma-separated: cpu")
     parser.add_argument(
         "--torch-tf32",
         type=int,
@@ -127,14 +126,14 @@ def main():
     # Parse providers
     providers = []
     for p in [s.strip().lower() for s in args.providers.split(",") if s.strip()]:
-        if p == "cuda":
-            providers.append("CUDAExecutionProvider")
-        elif p == "cpu":
+        if p == "cpu":
             providers.append("CPUExecutionProvider")
         else:
             raise ValueError(f"unknown provider key: {p}")
     if not providers:
         providers = ["CPUExecutionProvider"]
+    if providers != ["CPUExecutionProvider"]:
+        raise ValueError("onnx 只允许 cpu provider（--providers cpu）")
 
     so = ort.SessionOptions()
     so.intra_op_num_threads = 1
@@ -145,18 +144,11 @@ def main():
     so.enable_mem_pattern = True
     so.enable_mem_reuse = True
 
-    # ORT TF32 control for CUDA EP (if supported by installed ORT build)
-    if "CUDAExecutionProvider" in providers:
-        try:
-            # Available in newer ORT builds; ignore if not supported.
-            so.add_session_config_entry("session.set_denormal_as_zero", "1")
-            so.add_session_config_entry("session.use_deterministic_compute", "1" if args.deterministic else "0")
-            so.add_session_config_entry(
-                "ep.cuda.allow_tf32",
-                "1" if args.ort_tf32 else "0",
-            )
-        except Exception:
-            pass
+    try:
+        so.add_session_config_entry("session.set_denormal_as_zero", "1")
+        so.add_session_config_entry("session.use_deterministic_compute", "1" if args.deterministic else "0")
+    except Exception:
+        pass
 
     ort_sess = ort.InferenceSession(onnx_path.as_posix(), sess_options=so, providers=providers)
     ort_in = ort_sess.get_inputs()[0].name
@@ -287,4 +279,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

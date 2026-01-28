@@ -19,6 +19,7 @@ from pathlib import Path
 
 from inference.cpu_runtime import configure_env_single_thread
 
+
 # Must happen before importing numpy/onnxruntime
 configure_env_single_thread()
 
@@ -32,7 +33,7 @@ def main():
     parser.add_argument("--frame-step", type=float, default=0.02, help="Seconds per frame (model receptive field step)")
     parser.add_argument("--min-duration", type=float, default=0.0, help="Minimum segment duration in seconds")
     parser.add_argument("--max-files", type=int, default=0, help="If >0, only process first N files")
-    parser.add_argument("--providers", type=str, default="cuda,cpu", help="Comma-separated: cuda,cpu")
+    parser.add_argument("--providers", type=str, default="cpu", help="Comma-separated: cpu")
     args = parser.parse_args()
 
     import numpy as np
@@ -48,7 +49,9 @@ def main():
     assert onnx_path.is_file(), f"onnx not found: {onnx_path}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Force CPU single-thread session regardless of args.providers (by request)
+    providers = [s.strip().lower() for s in args.providers.split(",") if s.strip()]
+    if providers != ["cpu"]:
+        raise ValueError("onnx 只允许 cpu provider（--providers cpu）")
     sess = make_ort_session(ort, onnx_path.as_posix())
     input_name = sess.get_inputs()[0].name
     output_name = sess.get_outputs()[0].name
@@ -101,4 +104,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

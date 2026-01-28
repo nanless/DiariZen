@@ -95,6 +95,7 @@ def write_rttm(
 
 
 def dump_json(obj, output_path: str) -> None:
-    with open(output_path, "w", encoding="utf-8") as f:
+    p = Path(output_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p.as_posix(), "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False, indent=2)
-
