@@ -77,6 +77,9 @@ class Trainer:
         self.plot_lr = self.trainer_config.get("plot_lr", False)
         self.validation_interval = self.trainer_config.get("validation_interval", 1)
         self.max_num_checkpoints = self.trainer_config.get("max_num_checkpoints", 10)
+        # 0 = 关闭。按「训练循环迭代次数」计数（与 state.steps_trained 一致；含 grad accum 时每个 micro-batch +1）
+        self.save_ckpt_every_n_steps = self.trainer_config.get("save_ckpt_every_n_steps", 0)
+        self.max_num_step_checkpoints = self.trainer_config.get("max_num_step_checkpoints", 10)
         self.scheduler_name = self.trainer_config.get("scheduler_name", "constant_schedule_with_warmup")
         self.warmup_steps = self.trainer_config.get("warmup_steps", 0)
         self.warmup_ratio = self.trainer_config.get("warmup_ratio", 0.0)
@@ -269,6 +272,19 @@ class Trainer:
                 shutil.rmtree(checkpoint_dir.as_posix())
                 logger.info(f"Checkpoint {checkpoint_dir.as_posix()} is removed.")
 
+    def _save_step_checkpoint(self, step: int):
+        """Save under checkpoints/step_XXXXXXXX/ (local main only, same policy as epoch_*)."""
+        ckpt_path = self.checkpoints_dir / f"step_{str(step).zfill(8)}"
+        self.accelerator.save_state(ckpt_path.as_posix(), safe_serialization=False)
+        logger.info(f"Step checkpoint saved to {ckpt_path.as_posix()}")
+
+        step_ckpts = sorted(self.checkpoints_dir.glob("step_" + ("[0-9]" * 8)))
+        step_ckpts = [p for p in step_ckpts if p.is_dir()]
+        if len(step_ckpts) > self.max_num_step_checkpoints:
+            for old in step_ckpts[: -self.max_num_step_checkpoints]:
+                shutil.rmtree(old.as_posix())
+                logger.info(f"Removed old step checkpoint {old.as_posix()}")
+
 
     @staticmethod
     def get_warmup_steps(warmup_steps, max_steps, warmup_ratio):
@@ -421,6 +437,16 @@ class Trainer:
         logger.info(f"`update_steps_per_epoch`: {update_steps_per_epoch}")
         logger.info(f"`max_steps`: {max_steps}")
         logger.info(f"`max_epochs`: {max_epochs}")
+        if self.save_ckpt_every_n_steps > 0:
+            logger.info(
+                f"`save_ckpt_every_n_steps`={self.save_ckpt_every_n_steps} "
+                f"(batch iterations, see steps_trained); `max_num_step_checkpoints`={self.max_num_step_checkpoints}"
+            )
+        else:
+            logger.info(
+                "`save_ckpt_every_n_steps`=0: intermediate step checkpoints disabled "
+                "(only epoch_* / best per save_ckpt_interval; set >0 in [trainer.args] to enable step_*)"
+            )
 
         # Generator learning rate scheduler
         if self.warmup_steps > 0:
@@ -500,6 +526,14 @@ class Trainer:
                         dataloader_bar.set_description(" | ".join(desc_parts))
 
                 self.state.steps_trained += 1
+
+                if (
+                    self.save_ckpt_every_n_steps > 0
+                    and self.state.steps_trained % self.save_ckpt_every_n_steps == 0
+                    and self.accelerator.is_local_main_process
+                ):
+                    self._save_step_checkpoint(self.state.steps_trained)
+
             self.state.epochs_trained += 1
             self.training_epoch_end(training_epoch_output)
 
@@ -663,12 +697,25 @@ class Trainer:
         Args:
             training_epoch_output: the output of the training epoch. It may a list of the output of each batch.
         """
-        loss_keys = training_epoch_output[0].keys()
+        first_ok = next((x for x in training_epoch_output if x is not None), None)
+        if first_ok is None:
+            return
+        loss_keys = first_ok.keys()
 
-        # Compute mean loss on all loss items on a epoch
+        # Compute mean loss on all loss items on a epoch. Skip None steps and per-step None values
+        # (e.g. grad_norm_* is None on gradient accumulation micro-steps when sync_gradients is False).
         for key in loss_keys:
-            loss_items = [step_out[key] for step_out in training_epoch_output]
-            loss_mean = torch.mean(torch.tensor(loss_items))
+            vals = []
+            for step_out in training_epoch_output:
+                if step_out is None:
+                    continue
+                v = step_out.get(key)
+                if v is None:
+                    continue
+                vals.append(float(v.detach()) if torch.is_tensor(v) else float(v))
+            if not vals:
+                continue
+            loss_mean = torch.mean(torch.tensor(vals, dtype=torch.float32))
 
             if self.accelerator.is_local_main_process:
                 logger.info(f"Training Loss '{key}' on epoch {self.state.epochs_trained}: {loss_mean}")
