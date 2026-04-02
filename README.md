@@ -91,7 +91,7 @@ If you found this work helpful, please consider citing
 }
 
 @article{han2025efficient,
-  title={Efficient and Generalizable Speaker Diarization via Structured Pruning of Self-Supervised Models},
+  title={Efficient and Generalizable Speaker Diarization Via Structured Pruning of Self-Supervised Models},
   author={Han, Jiangyu and P{\'a}lka, Petr and Delcroix, Marc and Landini, Federico and Rohdin, Johan and Cernock{\`y}, Jan and Burget, Luk{\'a}{\v{s}}},
   journal={arXiv preprint arXiv:2506.18623},
   year={2025}
