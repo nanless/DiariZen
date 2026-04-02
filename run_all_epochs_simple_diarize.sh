@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# 针对特定实验运行所有 epoch 的 simple_diarize.py 脚本
-# 替换了原有的 batch_diarize_finetuned.py 逻辑
+# 使用指定实验目录下「最新」config toml 与「最新」epoch checkpoint 运行 simple_diarize.py
+# （按文件名排序取最新 toml；按 epoch 编号取最大且含 pytorch_model.bin 的目录）
 
 set -eo pipefail
 
@@ -13,24 +13,30 @@ REPO_DIR="$SCRIPT_DIR"
 export PYTHONPATH="$REPO_DIR/pyannote-audio:$REPO_DIR:$PYTHONPATH"
 
 # 配置参数
-EXP_NAME="kaldi_merged_1219_all_ft_large"
+EXP_NAME="${EXP_NAME:-generated_samples_for_DiariZen_0317_longaudio_vad_label_all_ft_large}"
 EXP_DIR="$REPO_DIR/recipes/diar_ssl/exp/$EXP_NAME"
 CHECKPOINTS_DIR="$EXP_DIR/checkpoints"
-CONFIG_PATH="$EXP_DIR/config__2026_01_20--18_03_58.toml"
 
-# 输入和输出目录（根据需要修改或通过环境变量传入）
+# 最新 toml（config__*.toml 按版本排序取最后一个）
+if [[ -n "${CONFIG_PATH:-}" ]]; then
+  :
+else
+  CONFIG_PATH=$(ls -1 "$EXP_DIR"/config__*.toml 2>/dev/null | sort -V | tail -n1) || true
+fi
+
+# 输入和输出目录（新目录名区分本次实验与「latest」单次推理）
 IN_ROOT="${IN_ROOT:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios}"
-OUT_BASE_DIR="${OUT_BASE_DIR:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios_Diarizen_simple_large_1219_all}"
+OUT_BASE_DIR="${OUT_BASE_DIR:-/root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios_Diarizen_simple_0317_longaudio_vad_label_all_ft_large_latest}"
 
 # 并发进程数（CPU 推理时可适当提高；CUDA 下建议保持 1）
 NUM_WORKERS="${NUM_WORKERS:-16}"
 
 echo "=========================================="
-echo "开始批量运行 simple_diarize.py"
+echo "开始运行 simple_diarize.py（最新 checkpoint + 最新 toml）"
 echo "=========================================="
 echo "实验名称: $EXP_NAME"
 echo "输入目录: $IN_ROOT"
-echo "输出基础目录: $OUT_BASE_DIR"
+echo "输出目录: $OUT_BASE_DIR"
 echo "Config: $CONFIG_PATH"
 echo "=========================================="
 
@@ -45,54 +51,43 @@ if [[ ! -d "$CHECKPOINTS_DIR" ]]; then
     exit 1
 fi
 
-if [[ ! -f "$CONFIG_PATH" ]]; then
-    echo "错误: config 文件不存在: $CONFIG_PATH" >&2
+if [[ -z "$CONFIG_PATH" || ! -f "$CONFIG_PATH" ]]; then
+    echo "错误: 未找到或无效的 config toml: ${CONFIG_PATH:-}" >&2
     exit 1
 fi
 
-# 获取所有 epoch 目录（按数字排序）以及 best 目录
-EPOCHS=$(ls -1 "$CHECKPOINTS_DIR" | grep -E "^(epoch_[0-9]+|best)$" | sort -V)
-
-if [[ -z "$EPOCHS" ]]; then
-    echo "错误: 未找到任何 epoch checkpoint 目录" >&2
+LATEST_EPOCH=$(ls -1 "$CHECKPOINTS_DIR" | grep -E '^epoch_[0-9]+$' | sort -V | tail -n1)
+if [[ -z "$LATEST_EPOCH" ]]; then
+    echo "错误: 未找到 epoch_* checkpoint 目录" >&2
     exit 1
 fi
 
-# 遍历每个 epoch
-for epoch in $EPOCHS; do
-    ckpt_dir="$CHECKPOINTS_DIR/$epoch"
-    out_dir="$OUT_BASE_DIR/$epoch"
-    
-    # 检查 checkpoint 是否完整
-    if [[ ! -f "$ckpt_dir/pytorch_model.bin" ]]; then
-        echo "跳过 $epoch: 缺少 pytorch_model.bin"
-        continue
-    fi
-    
-    echo ""
-    echo ">>> 处理 $epoch ..."
-    echo ">>> 输出目录: $out_dir"
-    
-    mkdir -p "$out_dir"
-    
-    # 使用 conda run 执行 simple_diarize.py
-    # 默认使用 GPU (cuda)，如果需要 CPU 可以添加 --device cpu
-    conda run -n diarizen python "$REPO_DIR/simple_diarize.py" \
-        "$IN_ROOT" \
-        --ckpt-dir "$ckpt_dir" \
-        --config "$CONFIG_PATH" \
-        --out-dir "$out_dir" \
-        --device cpu \
-        --num-workers "$NUM_WORKERS"
-        
-    if [[ $? -eq 0 ]]; then
-        echo "✓ $epoch 处理完成"
-    else
-        echo "✗ $epoch 处理失败"
-    fi
-done
+ckpt_dir="$CHECKPOINTS_DIR/$LATEST_EPOCH"
+if [[ ! -f "$ckpt_dir/pytorch_model.bin" ]]; then
+    echo "错误: 最新 epoch 缺少 pytorch_model.bin: $ckpt_dir" >&2
+    exit 1
+fi
+
+echo "使用 checkpoint: $ckpt_dir"
+
+mkdir -p "$OUT_BASE_DIR"
+
+conda run -n diarizen python "$REPO_DIR/simple_diarize.py" \
+    "$IN_ROOT" \
+    --ckpt-dir "$ckpt_dir" \
+    --config "$CONFIG_PATH" \
+    --out-dir "$OUT_BASE_DIR" \
+    --device cpu \
+    --num-workers "$NUM_WORKERS"
+
+if [[ $? -eq 0 ]]; then
+    echo "✓ 处理完成"
+else
+    echo "✗ 处理失败" >&2
+    exit 1
+fi
 
 echo ""
 echo "=========================================="
-echo "所有任务已完成！"
+echo "任务已完成！"
 echo "=========================================="
