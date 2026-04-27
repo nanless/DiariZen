@@ -23,7 +23,11 @@ from torchinfo import summary
 from tqdm.auto import tqdm
 
 from diarizen.logger import TensorboardLogger
-from diarizen.optimization import get_constant_schedule_with_warmup, get_linear_schedule_with_warmup
+from diarizen.optimization import (
+    get_constant_schedule_with_warmup,
+    get_cosine_schedule_with_warmup,
+    get_linear_schedule_with_warmup,
+)
 from diarizen.trainer_utils import TrainerState
 from diarizen.utils import prepare_empty_dir, print_env
 
@@ -302,6 +306,11 @@ class Trainer:
             return get_linear_schedule_with_warmup(
                 optimizer=optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=max_steps
             )
+        elif scheduler_name == "cosine_schedule_with_warmup":
+            return get_cosine_schedule_with_warmup(
+                optimizer=optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=max_steps
+            )
+        raise ValueError(f"Unsupported scheduler_name: {scheduler_name}")
 
     def create_schedulers(self, max_steps: int):
         """Create schedulers.
@@ -449,7 +458,7 @@ class Trainer:
             )
 
         # Generator learning rate scheduler
-        if self.warmup_steps > 0:
+        if self.warmup_steps > 0 or self.scheduler_name != "constant_schedule_with_warmup":
             self.create_schedulers(max_steps=max_steps)
         if self.use_one_cycle_lr:
             self.create_lr_one_cycle_scheduler(max_steps=max_steps * self.accelerator.num_processes)
@@ -499,7 +508,7 @@ class Trainer:
                     training_epoch_output.append(loss_dict)
 
                     if not self.accelerator.optimizer_step_was_skipped:
-                        if self.warmup_steps > 0:
+                        if self.warmup_steps > 0 or self.scheduler_name != "constant_schedule_with_warmup":
                             self.lr_scheduler_step()
 
                         if self.use_one_cycle_lr:

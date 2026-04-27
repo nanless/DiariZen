@@ -2,6 +2,7 @@
 # Copy from https://github.com/haoxiangsnr/spiking-fullsubnet/blob/main/audiozen/optimization.py
 # Copyright 2024 Hong Kong Polytechnic University (author: Xiang Hao, haoxiangsnr@gmail.com)
 
+import math
 from functools import partial
 
 from torch.optim import Optimizer
@@ -28,6 +29,35 @@ def _get_linear_schedule_with_warmup_lr_lambda(current_step: int, *, num_warmup_
 def get_linear_schedule_with_warmup(optimizer, num_warmup_steps, num_training_steps, last_epoch=-1):
     lr_lambda = partial(
         _get_linear_schedule_with_warmup_lr_lambda,
+        num_warmup_steps=num_warmup_steps,
+        num_training_steps=num_training_steps,
+    )
+    return LambdaLR(optimizer, lr_lambda, last_epoch)
+
+
+def _get_cosine_schedule_with_warmup_lr_lambda(
+    current_step: int,
+    *,
+    num_warmup_steps: int,
+    num_training_steps: int,
+):
+    if current_step < num_warmup_steps:
+        return float(current_step) / float(max(1, num_warmup_steps))
+
+    progress = float(current_step - num_warmup_steps) / float(
+        max(1, num_training_steps - num_warmup_steps)
+    )
+    return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
+
+
+def get_cosine_schedule_with_warmup(
+    optimizer,
+    num_warmup_steps,
+    num_training_steps,
+    last_epoch=-1,
+):
+    lr_lambda = partial(
+        _get_cosine_schedule_with_warmup_lr_lambda,
         num_warmup_steps=num_warmup_steps,
         num_training_steps=num_training_steps,
     )

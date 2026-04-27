@@ -18,6 +18,9 @@ max_patience = 10
 max_num_checkpoints = 100
 gradient_accumulation_steps = 1
 validation_interval = 1
+scheduler_name = "cosine_schedule_with_warmup"
+warmup_steps = 100
+warmup_ratio = 0.0
 freeze_wavlm = false
 lr_decay = false
 use_one_cycle_lr = false
@@ -30,7 +33,7 @@ lr = 5e-6
 [optimizer_big]
 path = "torch.optim.AdamW"
 [optimizer_big.args]
-lr = 1e-4
+lr = 5e-4
 
 [model]
 path = "diarizen.models.eend.model_nemo_nest_conformer.Model"
@@ -46,7 +49,7 @@ num_head = 4
 num_layer = 4
 dropout = 0.1
 chunk_size = 8
-use_posi = false
+use_posi = true
 output_activate_function = false
 selected_channel = 0
 max_speakers_per_chunk = 4
