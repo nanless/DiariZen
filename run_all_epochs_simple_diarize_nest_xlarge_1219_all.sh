@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 
-# 批量使用 simple_diarize.py 跑两个 NEST xlarge 实验目录下的所有 epoch checkpoint。
+# 批量使用 simple_diarize.py 跑三个 NEST xlarge 实验目录下的所有 epoch checkpoint。
 # 默认输入目录固定为：
 #   /root/code/own/download_gp_online_audios_for_speakerdetection_1113/original_audios
 #
 # 默认实验目录：
 #   /root/code/github_repos/DiariZen/recipes/diar_ssl/exp/kaldi_merged_1219_all_ft_nest_xlarge_2gpu
 #   /root/code/github_repos/DiariZen/recipes/diar_ssl/exp/kaldi_merged_1219_all_ft_nest_xlarge_2gpu_continue_lr1e-6_1e-4
+#   /root/code/github_repos/DiariZen/recipes/diar_ssl/exp/kaldi_merged_1219_all_ft_nest_xlarge_2gpu_continue_lr1e-6_1e-4_continue_epoch0003_1gpu_acc2
 #
 # 输出结构：
 #   $OUT_BASE_DIR/<exp_name>/<epoch_xxxx>/
@@ -31,8 +32,9 @@ CONDA_ENV="${CONDA_ENV:-diarizen-nemo}"
 export CUDA_VISIBLE_DEVICES
 
 EXP_DIRS=(
-  "/root/code/github_repos/DiariZen/recipes/diar_ssl/exp/kaldi_merged_1219_all_ft_nest_xlarge_2gpu"
-  "/root/code/github_repos/DiariZen/recipes/diar_ssl/exp/kaldi_merged_1219_all_ft_nest_xlarge_2gpu_continue_lr1e-6_1e-4"
+  # "/root/code/github_repos/DiariZen/recipes/diar_ssl/exp/kaldi_merged_1219_all_ft_nest_xlarge_2gpu"
+  # "/root/code/github_repos/DiariZen/recipes/diar_ssl/exp/kaldi_merged_1219_all_ft_nest_xlarge_2gpu_continue_lr1e-6_1e-4"
+  "/root/code/github_repos/DiariZen/recipes/diar_ssl/exp/kaldi_merged_1219_all_ft_nest_xlarge_2gpu_continue_lr1e-6_1e-4_continue_epoch0003_1gpu_acc2"
 )
 
 check_dir() {

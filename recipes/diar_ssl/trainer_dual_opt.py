@@ -47,9 +47,15 @@ class Trainer(BaseTrainer):
         self.accelerator.clip_grad_norm_(model.parameters(), clip_value)  
 
     def training_step(self, batch, batch_idx):
-        self.optimizer_small.zero_grad()
-        self.optimizer_big.zero_grad()
-
+        # NOTE on gradient accumulation:
+        # `AcceleratedOptimizer.{step,zero_grad}` are no-ops on micro-batches where
+        # `sync_gradients=False`, but they DO run on the sync micro-batch (the last
+        # one of an accumulation cycle). If `zero_grad()` is called BEFORE backward
+        # on that sync iteration, the gradients accumulated from the previous N-1
+        # micro-batches are wiped out, which silently breaks accumulation. We follow
+        # the canonical Accelerate pattern: backward -> (clip on sync) -> step ->
+        # zero_grad, so the zero_grad after step only fires on sync iterations and
+        # cleanly resets for the next cycle.
         xs, target = batch['xs'], batch['ts'] 
         frame_mask = batch.get('mask', None)
         if frame_mask is not None:
@@ -86,7 +92,8 @@ class Trainer(BaseTrainer):
         grad_norm_small = None
         grad_norm_big = None
         if self.accelerator.sync_gradients:
-            # The gradients are added across all processes in this cumulative gradient accumulation step.
+            # The gradients are accumulated across micro-batches and reduced across
+            # processes at this point, so grad-norm/clip operate on the full update.
             grad_norm_small = self.compute_grad_norm(
                 self.model, self.optimizer_small.param_groups[0]["params"]
             )
@@ -97,6 +104,8 @@ class Trainer(BaseTrainer):
                                
         self.optimizer_small.step()
         self.optimizer_big.step()
+        self.optimizer_small.zero_grad()
+        self.optimizer_big.zero_grad()
         
         return {
             "Loss": loss.detach(),
