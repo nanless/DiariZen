@@ -1,0 +1,247 @@
+{
+  "summary": {
+    "quantize": "MatMul/Gemm dynamic INT8, Conv FP32",
+    "provider": "CPUExecutionProvider",
+    "num_files": 21,
+    "total_audio_s": 1074.46,
+    "total_frames": 53702,
+    "frame_exact_match_rate": 0.9788276041860638,
+    "frame_mismatch_rate": 0.021172395813936165,
+    "speaker_cell_match_rate": 0.9927749432050947,
+    "cross_der_percent": 4.277330524415018,
+    "cross_jer_percent": 9.95379328450172
+  },
+  "per_file": [
+    {
+      "audio": "EN2002a_30s.wav",
+      "duration_s": 30.0,
+      "frames": 1499,
+      "frame_exact_match_rate": 0.987992,
+      "frame_mismatch_frames": 18,
+      "speaker_cell_match_rate": 0.996831,
+      "num_segments_fp32": 19,
+      "num_segments_int8": 23,
+      "segment_count_delta": 4
+    },
+    {
+      "audio": "077f5ff0341a48578ca364856082499c.wav",
+      "duration_s": 60.16,
+      "frames": 3007,
+      "frame_exact_match_rate": 0.999002,
+      "frame_mismatch_frames": 3,
+      "speaker_cell_match_rate": 0.999751,
+      "num_segments_fp32": 18,
+      "num_segments_int8": 18,
+      "segment_count_delta": 0
+    },
+    {
+      "audio": "124678fbbf324d4da0902c03918c78aa.wav",
+      "duration_s": 28.48,
+      "frames": 1423,
+      "frame_exact_match_rate": 0.979621,
+      "frame_mismatch_frames": 29,
+      "speaker_cell_match_rate": 0.994905,
+      "num_segments_fp32": 11,
+      "num_segments_int8": 10,
+      "segment_count_delta": -1
+    },
+    {
+      "audio": "159ba054caee452d8847c735fc9982c9.wav",
+      "duration_s": 2.72,
+      "frames": 135,
+      "frame_exact_match_rate": 0.962963,
+      "frame_mismatch_frames": 5,
+      "speaker_cell_match_rate": 0.990741,
+      "num_segments_fp32": 1,
+      "num_segments_int8": 3,
+      "segment_count_delta": 2
+    },
+    {
+      "audio": "22b9c8d8aaf6400689436097b7993ec6.wav",
+      "duration_s": 2.08,
+      "frames": 103,
+      "frame_exact_match_rate": 1.0,
+      "frame_mismatch_frames": 0,
+      "speaker_cell_match_rate": 1.0,
+      "num_segments_fp32": 1,
+      "num_segments_int8": 1,
+      "segment_count_delta": 0
+    },
+    {
+      "audio": "3078f036c56248b19467cae6d2b86777.wav",
+      "duration_s": 18.88,
+      "frames": 943,
+      "frame_exact_match_rate": 0.566278,
+      "frame_mismatch_frames": 409,
+      "speaker_cell_match_rate": 0.783934,
+      "num_segments_fp32": 28,
+      "num_segments_int8": 4,
+      "segment_count_delta": -24
+    },
+    {
+      "audio": "327b3e1f803b44a286b305bfc558cfd4.wav",
+      "duration_s": 60.16,
+      "frames": 3007,
+      "frame_exact_match_rate": 0.999002,
+      "frame_mismatch_frames": 3,
+      "speaker_cell_match_rate": 0.999751,
+      "num_segments_fp32": 33,
+      "num_segments_int8": 32,
+      "segment_count_delta": -1
+    },
+    {
+      "audio": "5cb09548c7be4c9ba4661483e0cf832b.wav",
+      "duration_s": 150.06,
+      "frames": 7502,
+      "frame_exact_match_rate": 0.993468,
+      "frame_mismatch_frames": 49,
+      "speaker_cell_match_rate": 0.998367,
+      "num_segments_fp32": 6,
+      "num_segments_int8": 4,
+      "segment_count_delta": -2
+    },
+    {
+      "audio": "6ccfd5aefc24426ba75a0de00d81dfa7.wav",
+      "duration_s": 30.08,
+      "frames": 1503,
+      "frame_exact_match_rate": 0.984697,
+      "frame_mismatch_frames": 23,
+      "speaker_cell_match_rate": 0.996174,
+      "num_segments_fp32": 6,
+      "num_segments_int8": 9,
+      "segment_count_delta": 3
+    },
+    {
+      "audio": "8d427a8c983d49ce9fb2996d2e680daf.wav",
+      "duration_s": 11.68,
+      "frames": 583,
+      "frame_exact_match_rate": 0.998285,
+      "frame_mismatch_frames": 1,
+      "speaker_cell_match_rate": 0.999571,
+      "num_segments_fp32": 5,
+      "num_segments_int8": 5,
+      "segment_count_delta": 0
+    },
+    {
+      "audio": "9ba5327e309444d8b2f67041f019de84.wav",
+      "duration_s": 60.0,
+      "frames": 2999,
+      "frame_exact_match_rate": 0.999667,
+      "frame_mismatch_frames": 1,
+      "speaker_cell_match_rate": 0.999917,
+      "num_segments_fp32": 15,
+      "num_segments_int8": 15,
+      "segment_count_delta": 0
+    },
+    {
+      "audio": "9d62d4f6c97345bdbec400971c5899f7.wav",
+      "duration_s": 60.16,
+      "frames": 3007,
+      "frame_exact_match_rate": 0.996342,
+      "frame_mismatch_frames": 11,
+      "speaker_cell_match_rate": 0.998503,
+      "num_segments_fp32": 19,
+      "num_segments_int8": 20,
+      "segment_count_delta": 1
+    },
+    {
+      "audio": "b560c040abd24009843ac076f9c763fd.wav",
+      "duration_s": 31.84,
+      "frames": 1591,
+      "frame_exact_match_rate": 0.999371,
+      "frame_mismatch_frames": 1,
+      "speaker_cell_match_rate": 0.999843,
+      "num_segments_fp32": 13,
+      "num_segments_int8": 13,
+      "segment_count_delta": 0
+    },
+    {
+      "audio": "bea7925f8384436eb80d3a1b7bb05cfb.wav",
+      "duration_s": 17.12,
+      "frames": 855,
+      "frame_exact_match_rate": 0.978947,
+      "frame_mismatch_frames": 18,
+      "speaker_cell_match_rate": 0.994737,
+      "num_segments_fp32": 4,
+      "num_segments_int8": 6,
+      "segment_count_delta": 2
+    },
+    {
+      "audio": "c57495123d65410baa9775e5c8639102.wav",
+      "duration_s": 284.32,
+      "frames": 14215,
+      "frame_exact_match_rate": 0.964685,
+      "frame_mismatch_frames": 502,
+      "speaker_cell_match_rate": 0.991171,
+      "num_segments_fp32": 355,
+      "num_segments_int8": 247,
+      "segment_count_delta": -108
+    },
+    {
+      "audio": "c7ab1616befc48a3b1190f52bed93188.wav",
+      "duration_s": 33.76,
+      "frames": 1687,
+      "frame_exact_match_rate": 0.997629,
+      "frame_mismatch_frames": 4,
+      "speaker_cell_match_rate": 0.999259,
+      "num_segments_fp32": 17,
+      "num_segments_int8": 18,
+      "segment_count_delta": 1
+    },
+    {
+      "audio": "c852cb8c9bec40efae1bfb912232af76.wav",
+      "duration_s": 1.76,
+      "frames": 87,
+      "frame_exact_match_rate": 1.0,
+      "frame_mismatch_frames": 0,
+      "speaker_cell_match_rate": 1.0,
+      "num_segments_fp32": 2,
+      "num_segments_int8": 2,
+      "segment_count_delta": 0
+    },
+    {
+      "audio": "ce6f5054ebe948edadb7035d83852870.wav",
+      "duration_s": 43.2,
+      "frames": 2159,
+      "frame_exact_match_rate": 0.994905,
+      "frame_mismatch_frames": 11,
+      "speaker_cell_match_rate": 0.998726,
+      "num_segments_fp32": 15,
+      "num_segments_int8": 15,
+      "segment_count_delta": 0
+    },
+    {
+      "audio": "db926d8836444e9d9459bf2a92216417.wav",
+      "duration_s": 60.16,
+      "frames": 3007,
+      "frame_exact_match_rate": 0.989358,
+      "frame_mismatch_frames": 32,
+      "speaker_cell_match_rate": 0.99734,
+      "num_segments_fp32": 3,
+      "num_segments_int8": 11,
+      "segment_count_delta": 8
+    },
+    {
+      "audio": "efe4d82c238a4b74af726432675b6a31.wav",
+      "duration_s": 60.16,
+      "frames": 3007,
+      "frame_exact_match_rate": 0.995344,
+      "frame_mismatch_frames": 14,
+      "speaker_cell_match_rate": 0.998836,
+      "num_segments_fp32": 35,
+      "num_segments_int8": 34,
+      "segment_count_delta": -1
+    },
+    {
+      "audio": "f9a417d1375f4167b4c7a1106c125a63.wav",
+      "duration_s": 27.68,
+      "frames": 1383,
+      "frame_exact_match_rate": 0.997831,
+      "frame_mismatch_frames": 3,
+      "speaker_cell_match_rate": 0.999458,
+      "num_segments_fp32": 12,
+      "num_segments_int8": 11,
+      "segment_count_delta": -1
+    }
+  ]
+}

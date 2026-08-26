@@ -1,0 +1,149 @@
+{
+  "input_shape": "[B, 1, 160000]",
+  "audio_sec": 10,
+  "gpu": "NVIDIA A800-SXM4-80GB",
+  "speed": {
+    "pytorch_fp32": {
+      "backend": "pytorch_fp32",
+      "batches": {
+        "1": {
+          "wall_ms_mean": 79.81,
+          "wall_ms_p50": 91.35,
+          "wall_ms_p95": 97.97,
+          "per_item_ms": 79.812,
+          "audio_sec_per_s": 125.3,
+          "rtf": 0.00798
+        },
+        "8": {
+          "wall_ms_mean": 198.49,
+          "wall_ms_p50": 199.89,
+          "wall_ms_p95": 200.16,
+          "per_item_ms": 24.811,
+          "audio_sec_per_s": 403.0,
+          "rtf": 0.00248
+        },
+        "32": {
+          "wall_ms_mean": 400.29,
+          "wall_ms_p50": 400.39,
+          "wall_ms_p95": 411.31,
+          "per_item_ms": 12.509,
+          "audio_sec_per_s": 799.4,
+          "rtf": 0.00125
+        },
+        "50": {
+          "wall_ms_mean": 532.39,
+          "wall_ms_p50": 529.53,
+          "wall_ms_p95": 572.6,
+          "per_item_ms": 10.648,
+          "audio_sec_per_s": 939.2,
+          "rtf": 0.00106
+        }
+      }
+    },
+    "pytorch_fp16": {
+      "backend": "pytorch_fp16",
+      "batches": {
+        "1": {
+          "wall_ms_mean": 100.06,
+          "wall_ms_p50": 100.24,
+          "wall_ms_p95": 103.53,
+          "per_item_ms": 100.061,
+          "audio_sec_per_s": 99.9,
+          "rtf": 0.01001
+        },
+        "8": {
+          "wall_ms_mean": 140.41,
+          "wall_ms_p50": 121.76,
+          "wall_ms_p95": 182.24,
+          "per_item_ms": 17.551,
+          "audio_sec_per_s": 569.8,
+          "rtf": 0.00176
+        },
+        "32": {
+          "wall_ms_mean": 289.67,
+          "wall_ms_p50": 294.77,
+          "wall_ms_p95": 302.84,
+          "per_item_ms": 9.052,
+          "audio_sec_per_s": 1104.7,
+          "rtf": 0.00091
+        },
+        "50": {
+          "wall_ms_mean": 349.04,
+          "wall_ms_p50": 354.83,
+          "wall_ms_p95": 375.35,
+          "per_item_ms": 6.981,
+          "audio_sec_per_s": 1432.5,
+          "rtf": 0.0007
+        }
+      }
+    },
+    "ort_cuda_fp32": {
+      "backend": "ort_cuda",
+      "batches": {
+        "1": {
+          "wall_ms_mean": 12.45,
+          "wall_ms_p50": 12.35,
+          "wall_ms_p95": 13.18,
+          "per_item_ms": 12.451,
+          "audio_sec_per_s": 803.1,
+          "rtf": 0.00125
+        },
+        "8": {
+          "wall_ms_mean": 43.36,
+          "wall_ms_p50": 43.34,
+          "wall_ms_p95": 43.61,
+          "per_item_ms": 5.419,
+          "audio_sec_per_s": 1845.2,
+          "rtf": 0.00054
+        },
+        "32": {
+          "wall_ms_mean": 152.73,
+          "wall_ms_p50": 152.73,
+          "wall_ms_p95": 152.8,
+          "per_item_ms": 4.773,
+          "audio_sec_per_s": 2095.1,
+          "rtf": 0.00048
+        },
+        "50": {
+          "wall_ms_mean": 232.74,
+          "wall_ms_p50": 232.66,
+          "wall_ms_p95": 233.01,
+          "per_item_ms": 4.655,
+          "audio_sec_per_s": 2148.3,
+          "rtf": 0.00047
+        }
+      }
+    }
+  },
+  "accuracy": {
+    "ort_cpu_vs_pytorch_fp32": {
+      "label": "ort_cpu_vs_pytorch_fp32",
+      "frame_exact_match_rate": 0.9999813787196008,
+      "speaker_cell_match_rate": 0.9999953446799001,
+      "cross_der_percent": 0.0037620857003122527,
+      "cross_jer_percent": 0.0016412815126051353
+    },
+    "pytorch_fp16_vs_fp32": {
+      "label": "pytorch_fp16_vs_fp32",
+      "frame_exact_match_rate": 0.9986965103720532,
+      "speaker_cell_match_rate": 0.9996042977915162,
+      "cross_der_percent": 0.2630985491994287,
+      "cross_jer_percent": 0.28413813900824186
+    },
+    "10s_ort_cpu_vs_pytorch_fp32": {
+      "label": "10s_ort_cpu_vs_pytorch_fp32",
+      "frame_exact_match_rate": 1.0,
+      "speaker_cell_match_rate": 1.0
+    },
+    "10s_pytorch_fp16_vs_fp32": {
+      "label": "10s_pytorch_fp16_vs_fp32",
+      "frame_exact_match_rate": 0.9972166555332888,
+      "speaker_cell_match_rate": 0.9989423291026498
+    }
+  },
+  "notes": [
+    "TensorRT: system TRT 10.13 CUDA init error 35; pip install into diarizen failed.",
+    "Selective FP8/INT8 TRT not run: needs L4/H100 + working TensorRT builder.",
+    "ORT CUDA EP errors on some long audios; accuracy ORT via CPU EP."
+  ]
+}
