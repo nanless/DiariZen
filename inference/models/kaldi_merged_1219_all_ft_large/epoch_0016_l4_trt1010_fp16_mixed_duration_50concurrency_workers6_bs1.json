@@ -1,0 +1,1099 @@
+{
+  "scope": "mixed-duration batch=1; exactly one segmentation forward per request; no windowing; 6 persistent worker threads and independent CUDA streams",
+  "created_utc": "2026-08-27T11:57:24.692832+00:00",
+  "benchmark_lock_contract": "/tmp/diarizen_l4_benchmark.lock",
+  "sample_rate": 16000,
+  "max_seconds": 30.0,
+  "worker_count": 6,
+  "warmup_waves": 2,
+  "repeats_per_manifest": 10,
+  "measurement_order": "A/B forward-reverse alternating by warmup wave and measured round",
+  "assignment": "LPT descending estimated GPU ms, greedily assigned to lower cumulative worker load",
+  "estimate_source": "--estimate-ms-json with quadratic GPU-ms fallback",
+  "preflight": {
+    "gpu": "NVIDIA L4, GPU-841c039c-20c0-5e12-c07c-9375d60a6e38, 535.129.03, 23034, 1, 0",
+    "compute_processes": ""
+  },
+  "environment": {
+    "python": "3.10.18 | packaged by conda-forge | (main, Jun  4 2025, 14:45:41) [GCC 13.3.0]",
+    "platform": "Linux-5.4.250-9-velinux1-amd64-x86_64-with-glibc2.31",
+    "gpu": "NVIDIA L4",
+    "compute_capability": [
+      8,
+      9
+    ],
+    "torch": "2.3.1+cu121",
+    "torch_cuda": "12.1",
+    "tensorrt": "10.10.0.31"
+  },
+  "route_engines": {
+    "short_dynamic": {
+      "path": "/root/code/github_repos/DiariZen/inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_dynamic/segmentation_bs1_2s-16s_opt6s_fp16.plan",
+      "bytes": 160327476,
+      "sha256": "fc23c75ab51d18db436924b2a306633fea93c41845bc612bc66c0634290e6276",
+      "input_name": "waveforms",
+      "output_name": "multilabel",
+      "profile": {
+        "min": {
+          "shape": [
+            1,
+            1,
+            32000
+          ],
+          "seconds": 2.0
+        },
+        "opt": {
+          "shape": [
+            1,
+            1,
+            96000
+          ],
+          "seconds": 6.0
+        },
+        "max": {
+          "shape": [
+            1,
+            1,
+            256000
+          ],
+          "seconds": 16.0
+        }
+      },
+      "device_memory_bytes_per_context": 224892928
+    },
+    "mid_dynamic": {
+      "path": "/root/code/github_repos/DiariZen/inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_dynamic/segmentation_bs1_2s-16s_opt10s_fp16.plan",
+      "bytes": 161162652,
+      "sha256": "0eddd32a01614986613755de9f2ca6f339ddb983691a1782524b042c2dd3f7a5",
+      "input_name": "waveforms",
+      "output_name": "multilabel",
+      "profile": {
+        "min": {
+          "shape": [
+            1,
+            1,
+            32000
+          ],
+          "seconds": 2.0
+        },
+        "opt": {
+          "shape": [
+            1,
+            1,
+            160000
+          ],
+          "seconds": 10.0
+        },
+        "max": {
+          "shape": [
+            1,
+            1,
+            256000
+          ],
+          "seconds": 16.0
+        }
+      },
+      "device_memory_bytes_per_context": 246657536
+    },
+    "fixed10": {
+      "path": "/root/code/github_repos/DiariZen/inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010/segmentation_10s_bs1_fp16.plan",
+      "bytes": 163620996,
+      "sha256": "16b865f3876d976b29ef905f428f51066e28e303f770fa31313b2712dffed237",
+      "input_name": "waveforms",
+      "output_name": "multilabel",
+      "profile": {
+        "min": {
+          "shape": [
+            1,
+            1,
+            160000
+          ],
+          "seconds": 10.0
+        },
+        "opt": {
+          "shape": [
+            1,
+            1,
+            160000
+          ],
+          "seconds": 10.0
+        },
+        "max": {
+          "shape": [
+            1,
+            1,
+            160000
+          ],
+          "seconds": 10.0
+        }
+      },
+      "device_memory_bytes_per_context": 132473344
+    },
+    "fixed16": {
+      "path": "/root/code/github_repos/DiariZen/inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s/segmentation_16s_bs1_fp16.plan",
+      "bytes": 171371492,
+      "sha256": "97efeda97c7f9998af17c1909289ef084215daa277ca34c91555d46e97232fac",
+      "input_name": "waveforms",
+      "output_name": "multilabel",
+      "profile": {
+        "min": {
+          "shape": [
+            1,
+            1,
+            256000
+          ],
+          "seconds": 16.0
+        },
+        "opt": {
+          "shape": [
+            1,
+            1,
+            256000
+          ],
+          "seconds": 16.0
+        },
+        "max": {
+          "shape": [
+            1,
+            1,
+            256000
+          ],
+          "seconds": 16.0
+        }
+      },
+      "device_memory_bytes_per_context": 210734080
+    },
+    "long_dynamic": {
+      "path": "/root/code/github_repos/DiariZen/inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_dynamic/segmentation_bs1_16s-30s_opt24s_fp16.plan",
+      "bytes": 161178076,
+      "sha256": "2fc71805d0d710164a6db0f98368ac24e1c1ebacf047318e61e9ef9bcccd1868",
+      "input_name": "waveforms",
+      "output_name": "multilabel",
+      "profile": {
+        "min": {
+          "shape": [
+            1,
+            1,
+            256000
+          ],
+          "seconds": 16.0
+        },
+        "opt": {
+          "shape": [
+            1,
+            1,
+            384000
+          ],
+          "seconds": 24.0
+        },
+        "max": {
+          "shape": [
+            1,
+            1,
+            480000
+          ],
+          "seconds": 30.0
+        }
+      },
+      "device_memory_bytes_per_context": 487787008
+    }
+  },
+  "memory_snapshots": [
+    {
+      "label": "before_engine_deserialize",
+      "cuda_free_mib": 22508.875,
+      "cuda_total_mib": 22699.875,
+      "torch_allocated_mib": 0.0,
+      "torch_reserved_mib": 0.0,
+      "nvidia_smi": "191, 23034, 1, 39, P0"
+    },
+    {
+      "label": "after_engine_deserialize",
+      "cuda_free_mib": 21794.875,
+      "cuda_total_mib": 22699.875,
+      "torch_allocated_mib": 0.0,
+      "torch_reserved_mib": 0.0,
+      "nvidia_smi": "905, 23034, 3, 40, P0"
+    },
+    {
+      "label": "after_worker_route_preallocation",
+      "cuda_free_mib": 13958.875,
+      "cuda_total_mib": 22699.875,
+      "torch_allocated_mib": 32.630859375,
+      "torch_reserved_mib": 44.0,
+      "nvidia_smi": "8741, 23034, 6, 42, P0"
+    },
+    {
+      "label": "after_warmup",
+      "cuda_free_mib": 13958.875,
+      "cuda_total_mib": 22699.875,
+      "torch_allocated_mib": 32.630859375,
+      "torch_reserved_mib": 44.0,
+      "nvidia_smi": "8741, 23034, 87, 44, P0"
+    },
+    {
+      "label": "after_measurement",
+      "cuda_free_mib": 13958.875,
+      "cuda_total_mib": 22699.875,
+      "torch_allocated_mib": 32.630859375,
+      "torch_reserved_mib": 44.0,
+      "nvidia_smi": "8741, 23034, 86, 47, P0"
+    }
+  ],
+  "results": {
+    "A": {
+      "manifest": "A",
+      "manifest_stats": {
+        "requests": 50,
+        "mean_seconds": 5.5,
+        "median_seconds": 4.5,
+        "p95_seconds": 12.0,
+        "max_seconds": 22.0,
+        "above_16_requests": 2,
+        "above_16_percent": 4.0,
+        "duration_counts": {
+          "1": 4,
+          "2": 6,
+          "3": 8,
+          "4.5": 8,
+          "5": 7,
+          "6": 5,
+          "8": 5,
+          "10": 3,
+          "12": 2,
+          "18": 1,
+          "22": 1
+        }
+      },
+      "measured_bursts": 10,
+      "measured_requests": 500,
+      "burst_mean_ms": 267.265608215332,
+      "burst_p50_ms": 265.1216735839844,
+      "burst_p95_ms": 283.4408187866211,
+      "host_wall_mean_ms": 267.3729853704572,
+      "host_wall_p50_ms": 265.2291413396597,
+      "host_wall_p95_ms": 283.54210602119565,
+      "request_completion_p50_ms": 166.9145278930664,
+      "request_completion_p95_ms": 262.4744354248047,
+      "requests_per_second": 187.07981297659416,
+      "burst_samples_ms": [
+        263.33294677734375,
+        263.58038330078125,
+        264.34954833984375,
+        254.23609924316406,
+        271.3000183105469,
+        269.5176696777344,
+        291.4183349609375,
+        265.893798828125,
+        273.6905212402344,
+        255.33676147460938
+      ],
+      "worker_estimated_gpu_ms": [
+        40.283,
+        40.214999999999996,
+        40.445,
+        38.186,
+        40.013,
+        40.013
+      ],
+      "worker_assignments": [
+        [
+          {
+            "request_id": "A-49",
+            "duration_seconds": 22.0,
+            "padded_seconds": 22.0,
+            "route": "long_dynamic",
+            "estimated_gpu_ms": 19.482
+          },
+          {
+            "request_id": "A-27",
+            "duration_seconds": 5.0,
+            "padded_seconds": 5.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.074
+          },
+          {
+            "request_id": "A-18",
+            "duration_seconds": 4.5,
+            "padded_seconds": 4.5,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.789
+          },
+          {
+            "request_id": "A-21",
+            "duration_seconds": 4.5,
+            "padded_seconds": 4.5,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.789
+          },
+          {
+            "request_id": "A-11",
+            "duration_seconds": 3.0,
+            "padded_seconds": 3.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.152
+          },
+          {
+            "request_id": "A-17",
+            "duration_seconds": 3.0,
+            "padded_seconds": 3.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.152
+          },
+          {
+            "request_id": "A-08",
+            "duration_seconds": 2.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          }
+        ],
+        [
+          {
+            "request_id": "A-48",
+            "duration_seconds": 18.0,
+            "padded_seconds": 18.0,
+            "route": "long_dynamic",
+            "estimated_gpu_ms": 15.079
+          },
+          {
+            "request_id": "A-33",
+            "duration_seconds": 6.0,
+            "padded_seconds": 6.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.357
+          },
+          {
+            "request_id": "A-26",
+            "duration_seconds": 5.0,
+            "padded_seconds": 5.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.074
+          },
+          {
+            "request_id": "A-32",
+            "duration_seconds": 5.0,
+            "padded_seconds": 5.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.074
+          },
+          {
+            "request_id": "A-24",
+            "duration_seconds": 4.5,
+            "padded_seconds": 4.5,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.789
+          },
+          {
+            "request_id": "A-14",
+            "duration_seconds": 3.0,
+            "padded_seconds": 3.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.152
+          },
+          {
+            "request_id": "A-02",
+            "duration_seconds": 1.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          },
+          {
+            "request_id": "A-07",
+            "duration_seconds": 2.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          }
+        ],
+        [
+          {
+            "request_id": "A-46",
+            "duration_seconds": 12.0,
+            "padded_seconds": 12.0,
+            "route": "mid_dynamic",
+            "estimated_gpu_ms": 9.897
+          },
+          {
+            "request_id": "A-42",
+            "duration_seconds": 8.0,
+            "padded_seconds": 8.0,
+            "route": "mid_dynamic",
+            "estimated_gpu_ms": 6.334
+          },
+          {
+            "request_id": "A-35",
+            "duration_seconds": 6.0,
+            "padded_seconds": 6.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.357
+          },
+          {
+            "request_id": "A-29",
+            "duration_seconds": 5.0,
+            "padded_seconds": 5.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.074
+          },
+          {
+            "request_id": "A-20",
+            "duration_seconds": 4.5,
+            "padded_seconds": 4.5,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.789
+          },
+          {
+            "request_id": "A-10",
+            "duration_seconds": 3.0,
+            "padded_seconds": 3.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.152
+          },
+          {
+            "request_id": "A-15",
+            "duration_seconds": 3.0,
+            "padded_seconds": 3.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.152
+          },
+          {
+            "request_id": "A-03",
+            "duration_seconds": 1.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          },
+          {
+            "request_id": "A-09",
+            "duration_seconds": 2.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          }
+        ],
+        [
+          {
+            "request_id": "A-47",
+            "duration_seconds": 12.0,
+            "padded_seconds": 12.0,
+            "route": "mid_dynamic",
+            "estimated_gpu_ms": 9.897
+          },
+          {
+            "request_id": "A-43",
+            "duration_seconds": 10.0,
+            "padded_seconds": 10.0,
+            "route": "fixed10",
+            "estimated_gpu_ms": 6.283
+          },
+          {
+            "request_id": "A-34",
+            "duration_seconds": 6.0,
+            "padded_seconds": 6.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.357
+          },
+          {
+            "request_id": "A-28",
+            "duration_seconds": 5.0,
+            "padded_seconds": 5.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.074
+          },
+          {
+            "request_id": "A-19",
+            "duration_seconds": 4.5,
+            "padded_seconds": 4.5,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.789
+          },
+          {
+            "request_id": "A-25",
+            "duration_seconds": 4.5,
+            "padded_seconds": 4.5,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.789
+          },
+          {
+            "request_id": "A-16",
+            "duration_seconds": 3.0,
+            "padded_seconds": 3.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.152
+          },
+          {
+            "request_id": "A-04",
+            "duration_seconds": 2.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          }
+        ],
+        [
+          {
+            "request_id": "A-38",
+            "duration_seconds": 8.0,
+            "padded_seconds": 8.0,
+            "route": "mid_dynamic",
+            "estimated_gpu_ms": 6.334
+          },
+          {
+            "request_id": "A-40",
+            "duration_seconds": 8.0,
+            "padded_seconds": 8.0,
+            "route": "mid_dynamic",
+            "estimated_gpu_ms": 6.334
+          },
+          {
+            "request_id": "A-44",
+            "duration_seconds": 10.0,
+            "padded_seconds": 10.0,
+            "route": "fixed10",
+            "estimated_gpu_ms": 6.283
+          },
+          {
+            "request_id": "A-36",
+            "duration_seconds": 6.0,
+            "padded_seconds": 6.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.357
+          },
+          {
+            "request_id": "A-30",
+            "duration_seconds": 5.0,
+            "padded_seconds": 5.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.074
+          },
+          {
+            "request_id": "A-22",
+            "duration_seconds": 4.5,
+            "padded_seconds": 4.5,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.789
+          },
+          {
+            "request_id": "A-12",
+            "duration_seconds": 3.0,
+            "padded_seconds": 3.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.152
+          },
+          {
+            "request_id": "A-00",
+            "duration_seconds": 1.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          },
+          {
+            "request_id": "A-05",
+            "duration_seconds": 2.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          }
+        ],
+        [
+          {
+            "request_id": "A-39",
+            "duration_seconds": 8.0,
+            "padded_seconds": 8.0,
+            "route": "mid_dynamic",
+            "estimated_gpu_ms": 6.334
+          },
+          {
+            "request_id": "A-41",
+            "duration_seconds": 8.0,
+            "padded_seconds": 8.0,
+            "route": "mid_dynamic",
+            "estimated_gpu_ms": 6.334
+          },
+          {
+            "request_id": "A-45",
+            "duration_seconds": 10.0,
+            "padded_seconds": 10.0,
+            "route": "fixed10",
+            "estimated_gpu_ms": 6.283
+          },
+          {
+            "request_id": "A-37",
+            "duration_seconds": 6.0,
+            "padded_seconds": 6.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.357
+          },
+          {
+            "request_id": "A-31",
+            "duration_seconds": 5.0,
+            "padded_seconds": 5.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.074
+          },
+          {
+            "request_id": "A-23",
+            "duration_seconds": 4.5,
+            "padded_seconds": 4.5,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.789
+          },
+          {
+            "request_id": "A-13",
+            "duration_seconds": 3.0,
+            "padded_seconds": 3.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.152
+          },
+          {
+            "request_id": "A-01",
+            "duration_seconds": 1.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          },
+          {
+            "request_id": "A-06",
+            "duration_seconds": 2.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          }
+        ]
+      ]
+    },
+    "B": {
+      "manifest": "B",
+      "manifest_stats": {
+        "requests": 50,
+        "mean_seconds": 5.86,
+        "median_seconds": 4.5,
+        "p95_seconds": 15.299999999999983,
+        "max_seconds": 26.0,
+        "above_16_requests": 3,
+        "above_16_percent": 6.0,
+        "duration_counts": {
+          "1": 4,
+          "2": 6,
+          "3": 8,
+          "4.5": 8,
+          "5": 7,
+          "6": 5,
+          "8": 4,
+          "10": 3,
+          "12": 2,
+          "18": 1,
+          "22": 1,
+          "26": 1
+        }
+      },
+      "measured_bursts": 10,
+      "measured_requests": 500,
+      "burst_mean_ms": 272.7038330078125,
+      "burst_p50_ms": 272.9415588378906,
+      "burst_p95_ms": 281.5196533203125,
+      "host_wall_mean_ms": 272.8233641013503,
+      "host_wall_p50_ms": 273.05779699236155,
+      "host_wall_p95_ms": 281.64922669529915,
+      "request_completion_p50_ms": 180.29930877685547,
+      "request_completion_p95_ms": 262.87742767333987,
+      "requests_per_second": 183.34909138797323,
+      "burst_samples_ms": [
+        268.5000915527344,
+        284.8935546875,
+        265.6441955566406,
+        273.4236145019531,
+        273.7841491699219,
+        272.4595031738281,
+        275.6429138183594,
+        277.39599609375,
+        265.2171936035156,
+        270.0771179199219
+      ],
+      "worker_estimated_gpu_ms": [
+        42.282000000000004,
+        44.333,
+        42.424,
+        43.293,
+        41.957,
+        43.802
+      ],
+      "worker_assignments": [
+        [
+          {
+            "request_id": "B-49",
+            "duration_seconds": 26.0,
+            "padded_seconds": 26.0,
+            "route": "long_dynamic",
+            "estimated_gpu_ms": 25.27
+          },
+          {
+            "request_id": "B-30",
+            "duration_seconds": 5.0,
+            "padded_seconds": 5.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.074
+          },
+          {
+            "request_id": "B-21",
+            "duration_seconds": 4.5,
+            "padded_seconds": 4.5,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.789
+          },
+          {
+            "request_id": "B-11",
+            "duration_seconds": 3.0,
+            "padded_seconds": 3.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.152
+          },
+          {
+            "request_id": "B-17",
+            "duration_seconds": 3.0,
+            "padded_seconds": 3.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.152
+          },
+          {
+            "request_id": "B-05",
+            "duration_seconds": 2.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          }
+        ],
+        [
+          {
+            "request_id": "B-48",
+            "duration_seconds": 22.0,
+            "padded_seconds": 22.0,
+            "route": "long_dynamic",
+            "estimated_gpu_ms": 19.482
+          },
+          {
+            "request_id": "B-35",
+            "duration_seconds": 6.0,
+            "padded_seconds": 6.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.357
+          },
+          {
+            "request_id": "B-28",
+            "duration_seconds": 5.0,
+            "padded_seconds": 5.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.074
+          },
+          {
+            "request_id": "B-19",
+            "duration_seconds": 4.5,
+            "padded_seconds": 4.5,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.789
+          },
+          {
+            "request_id": "B-25",
+            "duration_seconds": 4.5,
+            "padded_seconds": 4.5,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.789
+          },
+          {
+            "request_id": "B-15",
+            "duration_seconds": 3.0,
+            "padded_seconds": 3.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.152
+          },
+          {
+            "request_id": "B-03",
+            "duration_seconds": 1.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          },
+          {
+            "request_id": "B-09",
+            "duration_seconds": 2.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          }
+        ],
+        [
+          {
+            "request_id": "B-47",
+            "duration_seconds": 18.0,
+            "padded_seconds": 18.0,
+            "route": "long_dynamic",
+            "estimated_gpu_ms": 15.079
+          },
+          {
+            "request_id": "B-43",
+            "duration_seconds": 10.0,
+            "padded_seconds": 10.0,
+            "route": "fixed10",
+            "estimated_gpu_ms": 6.283
+          },
+          {
+            "request_id": "B-37",
+            "duration_seconds": 6.0,
+            "padded_seconds": 6.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.357
+          },
+          {
+            "request_id": "B-31",
+            "duration_seconds": 5.0,
+            "padded_seconds": 5.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.074
+          },
+          {
+            "request_id": "B-22",
+            "duration_seconds": 4.5,
+            "padded_seconds": 4.5,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.789
+          },
+          {
+            "request_id": "B-12",
+            "duration_seconds": 3.0,
+            "padded_seconds": 3.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.152
+          },
+          {
+            "request_id": "B-00",
+            "duration_seconds": 1.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          },
+          {
+            "request_id": "B-06",
+            "duration_seconds": 2.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          }
+        ],
+        [
+          {
+            "request_id": "B-45",
+            "duration_seconds": 12.0,
+            "padded_seconds": 12.0,
+            "route": "mid_dynamic",
+            "estimated_gpu_ms": 9.897
+          },
+          {
+            "request_id": "B-40",
+            "duration_seconds": 8.0,
+            "padded_seconds": 8.0,
+            "route": "mid_dynamic",
+            "estimated_gpu_ms": 6.334
+          },
+          {
+            "request_id": "B-44",
+            "duration_seconds": 10.0,
+            "padded_seconds": 10.0,
+            "route": "fixed10",
+            "estimated_gpu_ms": 6.283
+          },
+          {
+            "request_id": "B-26",
+            "duration_seconds": 5.0,
+            "padded_seconds": 5.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.074
+          },
+          {
+            "request_id": "B-32",
+            "duration_seconds": 5.0,
+            "padded_seconds": 5.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.074
+          },
+          {
+            "request_id": "B-23",
+            "duration_seconds": 4.5,
+            "padded_seconds": 4.5,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.789
+          },
+          {
+            "request_id": "B-13",
+            "duration_seconds": 3.0,
+            "padded_seconds": 3.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.152
+          },
+          {
+            "request_id": "B-01",
+            "duration_seconds": 1.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          },
+          {
+            "request_id": "B-07",
+            "duration_seconds": 2.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          }
+        ],
+        [
+          {
+            "request_id": "B-46",
+            "duration_seconds": 12.0,
+            "padded_seconds": 12.0,
+            "route": "mid_dynamic",
+            "estimated_gpu_ms": 9.897
+          },
+          {
+            "request_id": "B-41",
+            "duration_seconds": 8.0,
+            "padded_seconds": 8.0,
+            "route": "mid_dynamic",
+            "estimated_gpu_ms": 6.334
+          },
+          {
+            "request_id": "B-33",
+            "duration_seconds": 6.0,
+            "padded_seconds": 6.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.357
+          },
+          {
+            "request_id": "B-36",
+            "duration_seconds": 6.0,
+            "padded_seconds": 6.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.357
+          },
+          {
+            "request_id": "B-29",
+            "duration_seconds": 5.0,
+            "padded_seconds": 5.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.074
+          },
+          {
+            "request_id": "B-20",
+            "duration_seconds": 4.5,
+            "padded_seconds": 4.5,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.789
+          },
+          {
+            "request_id": "B-10",
+            "duration_seconds": 3.0,
+            "padded_seconds": 3.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.152
+          },
+          {
+            "request_id": "B-16",
+            "duration_seconds": 3.0,
+            "padded_seconds": 3.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.152
+          },
+          {
+            "request_id": "B-04",
+            "duration_seconds": 2.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          }
+        ],
+        [
+          {
+            "request_id": "B-38",
+            "duration_seconds": 8.0,
+            "padded_seconds": 8.0,
+            "route": "mid_dynamic",
+            "estimated_gpu_ms": 6.334
+          },
+          {
+            "request_id": "B-39",
+            "duration_seconds": 8.0,
+            "padded_seconds": 8.0,
+            "route": "mid_dynamic",
+            "estimated_gpu_ms": 6.334
+          },
+          {
+            "request_id": "B-42",
+            "duration_seconds": 10.0,
+            "padded_seconds": 10.0,
+            "route": "fixed10",
+            "estimated_gpu_ms": 6.283
+          },
+          {
+            "request_id": "B-34",
+            "duration_seconds": 6.0,
+            "padded_seconds": 6.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.357
+          },
+          {
+            "request_id": "B-27",
+            "duration_seconds": 5.0,
+            "padded_seconds": 5.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 4.074
+          },
+          {
+            "request_id": "B-18",
+            "duration_seconds": 4.5,
+            "padded_seconds": 4.5,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.789
+          },
+          {
+            "request_id": "B-24",
+            "duration_seconds": 4.5,
+            "padded_seconds": 4.5,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.789
+          },
+          {
+            "request_id": "B-14",
+            "duration_seconds": 3.0,
+            "padded_seconds": 3.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 3.152
+          },
+          {
+            "request_id": "B-02",
+            "duration_seconds": 1.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          },
+          {
+            "request_id": "B-08",
+            "duration_seconds": 2.0,
+            "padded_seconds": 2.0,
+            "route": "short_dynamic",
+            "estimated_gpu_ms": 2.845
+          }
+        ]
+      ]
+    }
+  },
+  "aggregate_requests": {
+    "bursts": 20,
+    "requests": 1000,
+    "requests_per_second": 185.1956654685475,
+    "burst_mean_ms": 269.98472061157224,
+    "burst_p50_ms": 269.7973937988281,
+    "burst_p95_ms": 285.21979370117185,
+    "host_wall_mean_ms": 270.09817473590374,
+    "host_wall_p50_ms": 269.9321862310171,
+    "host_wall_p95_ms": 285.35358030349016,
+    "request_completion_p50_ms": 175.39134979248047,
+    "request_completion_p95_ms": 262.8566619873047
+  }
+}

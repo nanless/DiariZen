@@ -1,0 +1,21 @@
+{
+  "reference_backend": "ORT CUDAExecutionProvider FP32",
+  "onnxruntime_version": "1.22.0",
+  "session_providers": [
+    "CUDAExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "batches": {
+    "1": {
+      "artifact": "/tmp/diarizen_trt_dynamic30_parity/ort_fp32_synthetic_30s_bs1.npz",
+      "output_shape": [
+        1,
+        1499,
+        4
+      ],
+      "output_value_counts": {
+        "0.0": 5996
+      }
+    }
+  }
+}

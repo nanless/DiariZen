@@ -1,0 +1,259 @@
+{
+  "backend": "TensorRT FP16 dynamic duration, fixed batch=1",
+  "tensorrt_version": "10.10.0.31",
+  "profile_seconds": {
+    "min": 2.0,
+    "opt": 6.0,
+    "max": 30.0
+  },
+  "actual_profile": {
+    "min": {
+      "shape": [
+        1,
+        1,
+        32000
+      ],
+      "seconds": 2.0
+    },
+    "opt": {
+      "shape": [
+        1,
+        1,
+        96000
+      ],
+      "seconds": 6.0
+    },
+    "max": {
+      "shape": [
+        1,
+        1,
+        480000
+      ],
+      "seconds": 30.0
+    }
+  },
+  "warmup": 10,
+  "repeats": 100,
+  "build_seconds": null,
+  "engine_bytes": 157825524,
+  "engine_device_memory_bytes": 453214208,
+  "onnx": {
+    "path": "inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_multilabel_hard.onnx",
+    "bytes": 278737023,
+    "sha256": "114ac3c37deb04b47deeeb50c2f5aff981cd4702d23b9df9b0bfe3ba07f85969"
+  },
+  "engine": {
+    "path": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_dynamic/segmentation_bs1_2s-30s_opt6s_fp16.plan",
+    "bytes": 157825524,
+    "sha256": "fd315a70361c67b94c8ba98a5ac911b3df57a8e58f8b7f184d2b6f1b044f9f97"
+  },
+  "environment": {
+    "python": "3.10.18 | packaged by conda-forge | (main, Jun  4 2025, 14:45:41) [GCC 13.3.0]",
+    "platform": "Linux-5.4.250-9-velinux1-amd64-x86_64-with-glibc2.31",
+    "gpu": "NVIDIA L4",
+    "gpu_uuid": "GPU-841c039c-20c0-5e12-c07c-9375d60a6e38",
+    "driver_version": "535.129.03",
+    "gpu_memory_total_mib": 23034,
+    "torch": "2.3.1+cu121",
+    "torch_cuda": "12.1",
+    "compute_capability": [
+      8,
+      9
+    ],
+    "tensorrt": "10.10.0.31"
+  },
+  "results": [
+    {
+      "input_seconds": 2.0,
+      "input_samples": 32000,
+      "mean_ms": 2.885,
+      "p50_ms": 2.884,
+      "p95_ms": 2.893,
+      "requests_per_second": 346.63,
+      "audio_seconds_per_second": 693.3,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          99,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 4.0,
+      "input_samples": 64000,
+      "mean_ms": 3.746,
+      "p50_ms": 3.755,
+      "p95_ms": 3.776,
+      "requests_per_second": 266.97,
+      "audio_seconds_per_second": 1067.9,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          199,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 5.0,
+      "input_samples": 80000,
+      "mean_ms": 4.216,
+      "p50_ms": 4.222,
+      "p95_ms": 4.279,
+      "requests_per_second": 237.22,
+      "audio_seconds_per_second": 1186.1,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          249,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 6.0,
+      "input_samples": 96000,
+      "mean_ms": 4.338,
+      "p50_ms": 4.345,
+      "p95_ms": 4.359,
+      "requests_per_second": 230.53,
+      "audio_seconds_per_second": 1383.2,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          299,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 8.0,
+      "input_samples": 128000,
+      "mean_ms": 7.08,
+      "p50_ms": 7.072,
+      "p95_ms": 7.129,
+      "requests_per_second": 141.25,
+      "audio_seconds_per_second": 1130.0,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          399,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 10.0,
+      "input_samples": 160000,
+      "mean_ms": 9.116,
+      "p50_ms": 9.114,
+      "p95_ms": 9.175,
+      "requests_per_second": 109.7,
+      "audio_seconds_per_second": 1097.0,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          499,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 12.0,
+      "input_samples": 192000,
+      "mean_ms": 11.278,
+      "p50_ms": 11.25,
+      "p95_ms": 11.586,
+      "requests_per_second": 88.67,
+      "audio_seconds_per_second": 1064.0,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          599,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 16.0,
+      "input_samples": 256000,
+      "mean_ms": 16.603,
+      "p50_ms": 16.608,
+      "p95_ms": 16.83,
+      "requests_per_second": 60.23,
+      "audio_seconds_per_second": 963.7,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          799,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 18.0,
+      "input_samples": 288000,
+      "mean_ms": 20.036,
+      "p50_ms": 19.986,
+      "p95_ms": 20.596,
+      "requests_per_second": 49.91,
+      "audio_seconds_per_second": 898.4,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          899,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 20.0,
+      "input_samples": 320000,
+      "mean_ms": 23.341,
+      "p50_ms": 23.357,
+      "p95_ms": 23.747,
+      "requests_per_second": 42.84,
+      "audio_seconds_per_second": 856.9,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          999,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 24.0,
+      "input_samples": 384000,
+      "mean_ms": 30.68,
+      "p50_ms": 30.645,
+      "p95_ms": 31.411,
+      "requests_per_second": 32.59,
+      "audio_seconds_per_second": 782.3,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          1199,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 30.0,
+      "input_samples": 480000,
+      "mean_ms": 44.072,
+      "p50_ms": 44.025,
+      "p95_ms": 44.934,
+      "requests_per_second": 22.69,
+      "audio_seconds_per_second": 680.7,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          1499,
+          4
+        ]
+      }
+    }
+  ]
+}

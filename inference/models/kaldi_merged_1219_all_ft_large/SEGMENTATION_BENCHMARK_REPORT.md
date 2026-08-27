@@ -3,7 +3,7 @@
 > **实验名称**：`kaldi_merged_1219_all_ft_large` / checkpoint `epoch_0016`  
 > **测试范围**：**仅 segmentation 模型**（不含 speaker embedding、VBx 聚类、滑窗重叠、RTTM 后处理）  
 > **测试日期**：2026-08-26～2026-08-27<br>
-> **测试 GPU**：NVIDIA A800-SXM4-80GB（原始测试）与 NVIDIA L4 24GB（固定 10s、最大 16s 与并发 50 复测）<br>
+> **测试 GPU**：NVIDIA A800-SXM4-80GB（历史测试）与 NVIDIA L4 24GB（固定/动态 2～30s、并发 50 复测）<br>
 > **对应线上模型**：与 `speaker_diarize_infer` 中 `epoch_0016_multilabel_hard.onnx` 为同一文件（MD5: `0a2142c0874e553206633e65b8348dd1`）
 
 ---
@@ -40,10 +40,12 @@
 
 | 假设 | 说明 |
 |------|------|
-| 输入 | 原始基准为固定 10 秒；线上容量补测覆盖 16 kHz 单通道、最长 **16 秒** → `[B, 1, 256000]` |
+| 输入 | 原始历史基准为固定 10 秒；当前线上分布为 16 kHz 单通道，平均 5～6 秒、中位数 4 秒多、约 5% 超过 16 秒、99.9% 不超过 30 秒 |
 | 输出 | 帧级 multilabel `{0,1}`，shape `[B, frames, 4]`（最多 4 说话人） |
-| 不包含 | embedding 提取、聚类、长音频滑窗、VAD、后处理 |
-| 并发语义 | 原始 A800 测试为 50 条 10s 拼 microbatch；L4 线上补测为 50 条 16s 同时到达并进入 batch=1 context/stream 队列 |
+| 单次推理约束 | **每条请求，包括 16～30 秒及极少数超过 30 秒的请求，都必须由同一个 segmentation 模型完成一次 forward；禁止切窗、拆分或静默截断** |
+| 不包含 | embedding 提取、聚类、VAD、后处理；当前 L4 新增性能测试只使用 synthetic tensor，不使用真实音频 |
+| 并发语义 | 原始 A800 测试为 50 条 10s 拼 microbatch；L4 历史最坏基线为 50 条固定 16s；当前生产代表性测试为 A/B 两种 50 请求混合时长 manifest，共 20 个 burst、1000 请求 |
+| 30 秒边界 | `99.9% <= 30s` 是业务分布约束，不是“绝对最大 30s”；主 TensorRT long profile 只覆盖到 30s，超过 30s 的低频请求必须走独立 ORT CUDA dynamic-shape overflow，或在明确绝对上限后另建 TensorRT overflow profile |
 
 ### 1.3 评估指标
 
@@ -60,7 +62,15 @@
 
 | 维度 | 结论 |
 |------|------|
-| **推荐部署** | L4 最长 16s 首选 **TensorRT 10.10 FP16**；固定 buffer + pinned memory + 独立 context/stream，单活跃槽位使用完整 CUDA Graph |
+| **推荐部署** | 1 张 L4，**TensorRT 10.10 FP16、batch=1、多 engine 按时长路由、4 个持久 worker/context、按预计 GPU work unit 调度**；不做动态合批 |
+| **当前业务分布** | 平均 5～6s、中位数 4 秒多、约 5% `>16s`、99.9% `<=30s`；所有请求只做一次 segmentation forward，禁止切窗/拆分/截断 |
+| **最终路由** | `<=7s` → dynamic 2/6/16；`7～8s` → dynamic 2/10/16；`8～10s` → fixed10；`10～12s` → dynamic 2/10/16；`12～16s` → fixed16；`16～30s` → dynamic 16/24/30 |
+| **30 秒单次 forward** | long 16/24/30 profile：mean/p95 **31.613/32.540ms**，输出 `[1,1499,4]`；证明 30s shape 可单次执行，不代表真实业务 P99.9 已测 |
+| **混合 50 并发** | A/B 各 10 轮，共 1000 请求；4-worker aggregate burst mean/p95 **250.060/265.993ms**，请求完成 p50/p95 **164.444/245.640ms**，等效吞吐 **199.952 req/s** |
+| **worker 扫描** | 已完成 1～8 workers 全扫描；3 workers 的 RPS 仅比 4 workers 高 **0.084%**，属于噪声级，而 4 workers 的 burst/request p95 更低，因此生产选择 4 workers；5～8 workers 已进入争用区 |
+| **相对全补 16s** | 固定 16s 双 context pinned 为 **91.923 req/s、543.935ms mean**；按时长路由吞吐约 **2.175×**，burst mean 与 GPU 单请求成本约下降 **54.03%** |
+| **生产 admission** | 混合分布满载约 199.952 req/s；以 80% 利用率并向下取整，建议 **159 req/s**，同时限制 `inflight_requests <= 50` 和 outstanding GPU work units |
+| **常驻显存** | 5 个路由 engine、4 个 worker、每 worker 每 route 独立 context/buffer 的 synthetic 压测 warmup 后约 **6151 MiB** |
 | **50 条 10s 墙钟** | **233 ms**（均摊 4.7 ms/条），约为 PyTorch FP16 的 **1.5×** 加速 |
 | **精度** | ORT vs PyTorch FP32：帧一致 **99.998%**，cross DER **0.004%**（几乎无损） |
 | **PyTorch FP16** | 大 batch 有加速，但不如 ORT；cross DER +0.26%（可接受） |
@@ -72,14 +82,14 @@
 | **L4 TensorRT FP16** | 10.10.0.31 已解决旧版崩溃；bs=1/4/8/32 比 ORT FP32 快 **2.96–3.26×** |
 | **L4 TensorRT 多精度** | 已完成严格 FP32、TF32、FP16、BF16、FP8、INT8、INT4 weight-only；四档 batch 中均为 **FP16 最快** |
 | **TensorRT PTQ 精度** | FP8 frame exact 约 **98.99–99.40%**；INT8 仅约 **0.20–0.60%** 且运行时非确定，不可用；INT4 weight-only 为 **96.79%** 且无加速 |
-| **L4 线上 16s** | FP16 batch=1 **10.741ms**；最终双 context pinned 链路 50 条总完成 mean/p95 **543.9/547.3ms**、请求完成 p95 **522.2ms**、约 **91.9 req/s** |
+| **L4 固定 16s 历史基线** | FP16 batch=1 **10.741ms**；最终双 context pinned 链路 50 条总完成 mean/p95 **543.9/547.3ms**、请求完成 p95 **522.2ms**、约 **91.9 req/s**，保留作“全部补到 16s”对照 |
 | **16s CUDA Graph** | 单 context 全链路 graph 比普通 enqueue mean/p95 快约 **2.6%/2.9%**，host enqueue 从约 1.425ms 降至 0.0079ms；双 context 时 6 种组合差异仅约 0.21%，不宣称额外吞吐收益 |
 | **TensorRT builder 扫描** | O4/O5、8/16GiB workspace、0/2 auxiliary streams 均未稳定优于现有 **O3/8GiB** plan；保留现有 engine |
 | **其他加速路径** | ORT CUDA Graph 仅快 **2.09%** 且仍比 TRT 慢 **3.54×**；真正的 PyTorch `compile(reduce-overhead)+SDPA+AMP` 为 **18.464ms**，比 eager AMP 快 **2.12×**，但仍比 TRT 慢 **1.72×** |
 | **线上 batch 策略** | **禁用动态合批**；16s 的 bs=2/4/8/16/32 每条成本均高于 bs=1，bs=32 吞吐仅为 bs=1 的 63.1% |
-| **可变时长** | 动态 duration plan 覆盖 2–16s；结合固定 10s/16s plan 做长度路由，短音频不必全部补到 16s |
+| **超过 30s** | 30s 不是绝对最大；若服务契约必须接收那不超过 0.1% 的 `>30s` 请求，保持单次 forward，先走独立 ORT CUDA dynamic-shape overflow；获得绝对上限后再构建低频 TRT overflow profile |
 
-**一句话**：线上最长 16s、并发上限 50 时，使用 **1 张 L4 + TensorRT FP16 + batch=1 + 2 个预分配 execution contexts + pinned/设备 buffer 复用 + 按时长路由**；单槽低并发走 CUDA Graph，50 请求突发由双槽队列调度，不做动态合批，ORT CUDA FP32 仅作为独立进程回退。
+**一句话**：当前分布下的最优解是 **1 张 L4 + TensorRT FP16 + batch=1 + 5 个按时长选择的 engine/profile + 4 个持久 worker + GPU work-unit admission**；实测混合吞吐约 199.952 req/s，生产按 159 req/s 限流；`>30s` 仍坚持单模型单次 forward，并由独立 ORT CUDA overflow 或有明确上限后的额外 TRT profile 承接。
 
 ---
 
@@ -142,11 +152,11 @@ Powerset 分类头 → argmax 硬解码 → multilabel [B, frames, 4]
 
 | 项目 | 配置 |
 |------|------|
-| GPU | 2× NVIDIA A800-SXM4-80GB |
-| GPU 使用策略 | benchmark 前检查 `nvidia-smi`，仅使用空闲 GPU 0 |
-| Python 环境 | conda `diarizen`，PyTorch 2.1.1，CUDA 12.1 |
-| ONNX Runtime | CUDA EP + CPU EP |
-| TensorRT | 系统 10.13.3.9，**CUDA init error 35**，`diarizen` 内 pip 安装失败 |
+| 历史 GPU | 2× NVIDIA A800-SXM4-80GB；旧章节保留原始结果 |
+| 当前 GPU | NVIDIA L4 24GB，driver 535.129.03；新增 2～30s/混合并发均在空闲 GPU 0 上独占执行 |
+| Python 环境 | ORT/PyTorch：conda `diarizen`，PyTorch 2.1.1，CUDA 12.1；TensorRT：`/root/miniforge3/envs/diarizen-trt1010` |
+| ONNX Runtime | 1.22.0，CUDA EP + CPU EP；30s reference 明确使用 ORT CUDA FP32 |
+| TensorRT | 当前 L4 使用 10.10.0.31；旧 A800 系统 TensorRT 初始化失败仅作为历史问题保留 |
 
 ### 4.2 速度测试方法
 
@@ -156,6 +166,10 @@ Powerset 分类头 → argmax 硬解码 → multilabel [B, frames, 4]
 4. PyTorch：GPU 端 `torch.cuda.synchronize()` 前后计时
 5. ORT：CUDA EP，`GraphOptimizationLevel.ORT_ENABLE_ALL`
 6. Batch 规模：1 / 8 / 32 / 50
+
+当前 L4 动态时长补测统一使用 batch=1、warmup 10、正式计时 100 次；逐点覆盖 2～30 秒，输出 shape 随原始时长增长。混合并发对 1～8 个持久 worker 分别执行相同 A/B manifest 各 10 轮，每档 1000 请求；每个 worker 为每个 route 使用独立 context/stream/buffer。混合结果按完整 50 请求 burst 的 GPU event 完成时间和每请求完成时间统计；显存通过 benchmark 前、engine 反序列化后、route 预分配后、warmup 后和计时后的快照记录。
+
+新增 2～30 秒速度、30 秒普通/对抗 synthetic parity 均不使用真实音频。30 秒 adversarial 输入只是将既有 10 秒非零 synthetic 重复 3 次；临时 NPZ 只用于跨 Conda 环境传递完全相同的波形/reference，不是模型资产或部署依赖。
 
 ### 4.3 精度测试方法
 
@@ -300,9 +314,9 @@ Engine inspector 的进一步分析解释了低精度没有超过 FP16 的原因
 
 INT8 的正类总数与参考接近，但位置几乎全部错位（cell exact 仅约 52.6%），排除了“只是全零/全一输出”的假象。表中 INT8 是一次 warmup 后的代表性回归；独立进程复测 frame exact 仍在约 0.20–0.60% 间波动。全 28 engine 在迁移后的 Conda env 中连续执行两次：除 INT8 外均为 **100% repeat exact**；INT8 仅为 **99.80–99.90% cell repeat exact**，说明同一 context、同一输入仍存在 hard-decision 波动。以上是比全静音输入更严格的 synthetic 功能检查，但按本轮约束没有真实音频，不能换算为 DER/JER，也不能替代上线验收。
 
-### 5.7 L4 线上最大 16 秒、并发 50（2026-08-27）
+### 5.7 历史基线：L4 全部固定 16 秒、并发 50（2026-08-27）
 
-本节仍只使用 synthetic tensor，不使用真实音频。固定 16 秒测试 warmup 10 次、计时 50 次；动态时长最终复测计时 100 次；50 请求突发测试每档 30 次。
+本节是用户业务分布更新前的历史最坏输入基线，仍只使用 synthetic tensor，不使用真实音频。固定 16 秒测试 warmup 10 次、计时 50 次；动态时长最终复测计时 100 次；50 请求突发测试每档 30 次。它不再代表当前平均 5～6 秒的生产流量，主要用于比较“所有输入补到 16 秒”的额外成本。
 
 #### 5.7.1 固定 16 秒 FP16：大 batch 反而降低吞吐
 
@@ -328,11 +342,11 @@ L4 为 Ada 架构；该模型在 batch=1 时已能很好利用 GPU/L2 cache。ba
 | 4 | 555.050 ms | 557.857 ms | 310.746 ms | 535.477 ms | 90.08 req/s |
 | 8 | 571.648 ms | 574.098 ms | 330.803 ms | 554.939 ms | 87.47 req/s |
 
-2 contexts 是最佳点；4/8 contexts 因共享 SM/L2/DRAM 产生争用。短复测测得 1/2 contexts 常驻设备内存约 **601/813 MiB**。本表是早期未计完整 pinned H2D/D2H 的历史执行基线；93.5 req/s 不再作为最终 admission 口径。最终生产形态复测见 5.8.2：91.923 req/s，admission 向下取整为 73 RPS。
+2 contexts 是最佳点；4/8 contexts 因共享 SM/L2/DRAM 产生争用。短复测测得 1/2 contexts 常驻设备内存约 **601/813 MiB**。本表是早期未计完整 pinned H2D/D2H 的历史执行基线；93.5 req/s 不再作为最终 admission 口径。最终固定 16s 生产形态复测见 5.8.2：91.923 req/s；当时按 80% 得到的 73 RPS 只适用于“所有请求都补到 16s”的旧假设，当前混合分布口径为约 147 RPS，见 5.9。
 
 “并发 50”不等于“50 RPS”：前者是同时在途请求数，后者才决定队列是否持续增长。若 50 条最坏请求在同一时刻突发，单卡请求完成 p95 约 514ms；若要求该突发 p95 明显低于 500ms，需要增加 GPU 副本，而不是增大 batch。
 
-#### 5.7.3 动态时长 batch=1
+#### 5.7.3 早期单 profile 动态时长 batch=1
 
 一个 FP16 plan 使用 `[1,1,32000] / [1,1,160000] / [1,1,256000]` 作为 min/opt/max profile，对应 2/10/16 秒。plan 为 153.7 MiB，构建 195.0s。
 
@@ -348,7 +362,7 @@ L4 为 Ada 架构；该模型在 batch=1 时已能很好利用 GPU/L2 cache。ba
 | 14s | 11.645 ms | 11.924 ms | 85.87 | 固定 16s |
 | 16s | 13.895 ms | 14.166 ms | 71.97 | 固定 16s |
 
-最低 GPU 时间的路由为：`<2s` 补到 2s；`2–8s` 动态 plan；`>8–10s` 固定 10s；`>10–12s` 动态 plan；`>12–16s` 固定 16s。若更重视运维简单而非短音频成本，可只保留固定 10s/16s 两档，但 2s 请求会从约 3.45ms 增至约 6.28ms。
+这张早期表只比较一个 2/10/16 dynamic plan 与 fixed10/fixed16。新增 2/6/16、宽 2/6/30、long 16/20/30、long 16/24/30 的完整逐点结果和最终路由见 5.9；当前生产结论不再由本表单独决定。
 
 #### 5.7.4 16 秒 synthetic parity
 
@@ -433,6 +447,176 @@ SDPA 微基准中，WavLM dense relative bias attention 的 auto kernel 比 manu
 真正的组合路径已经按“先安装 SDPA patch、再 `torch.compile`”补测，JSON 中保存 `sdpa_patch_installed_before_compile=true`。`reduce-overhead+SDPA+AMP` 比非 SDPA 的 reduce-overhead 再快 **4.32%**，且 mean/p95 均略优于 SDPA max-autotune；后者继续提示 L4 SM 数不足，首次编译时间还可能命中持久 Inductor cache。因此 PyTorch 实验性二级回退选择 `reduce-overhead + SDPA + AMP`，启动阶段预编译固定 16 秒 shape。
 
 两条组合路径的 hard output 在这条 synthetic 输入上均为 0/3196 mismatch，但 raw output 相对 eager FP32 未通过 `rtol=atol=1e-3` allclose（reduce-overhead max/mean abs 为 0.01407/0.00279）。这仍是一条全零 hard-output 输入，不能证明真实或非零 16 秒音频精度；没有真实验收前不能把该路径自动提升为生产主回退。该模型当前 `fullgraph=False` 下有 22 个 unique graphs 和 9 个 graph breaks，仍有进一步改写模型 `forward` 的空间，但在当前结果下不会超过 TensorRT。
+
+### 5.9 L4 真实业务时长分布与 30 秒单次 forward（2026-08-27）
+
+本节替换“线上最长 16 秒”的旧生产假设。当前已知业务分布为：平均 5～6 秒、中位数 4 秒多、约 5% 请求超过 16 秒、99.9% 请求不超过 30 秒。所有请求均保持 `[1,1,samples] -> [1,frames,4]` 的 **同一个 segmentation 模型、单次 TensorRT forward**；包括 16～30 秒输入也没有切窗、拆分或截断。全部速度输入仍是 synthetic tensor，未使用真实音频，因此本节是性能与 shape 覆盖结论，不是 DER/JER 或真实分布精度验收。
+
+#### 5.9.1 五种 dynamic profile 逐点实测
+
+下表均为 TensorRT 10.10 FP16、batch=1。不同 profile 会选择不同 tactics；min/opt/max 不只是 shape 合法范围，也会显著影响区间内各点性能，所以一个覆盖 2～30 秒的宽 profile 并不是最低延迟方案。
+
+**短 profile：2/6/16 秒（最终 `short_dynamic`）**
+
+| 输入 | mean | p95 | req/s | 输出 shape |
+|------|------|-----|-------|------------|
+| 2s | 2.845ms | 2.861ms | 351.46 | `[1,99,4]` |
+| 3s | 3.152ms | 3.190ms | 317.22 | `[1,149,4]` |
+| 4s | 3.636ms | 3.669ms | 275.06 | `[1,199,4]` |
+| 4.5s | 3.789ms | 3.830ms | 263.94 | `[1,224,4]` |
+| 5s | 4.074ms | 4.138ms | 245.45 | `[1,249,4]` |
+| 6s | 4.357ms | 4.390ms | 229.50 | `[1,299,4]` |
+| 7s | 5.382ms | 5.404ms | 185.81 | `[1,349,4]` |
+| 8s | 6.665ms | 6.695ms | 150.04 | `[1,399,4]` |
+| 9s | 7.651ms | 7.698ms | 130.70 | `[1,449,4]` |
+| 10s | 8.346ms | 8.387ms | 119.82 | `[1,499,4]` |
+| 11s | 9.306ms | 9.569ms | 107.46 | `[1,549,4]` |
+| 12s | 10.216ms | 10.440ms | 97.89 | `[1,599,4]` |
+| 13s | 11.317ms | 11.605ms | 88.36 | `[1,649,4]` |
+| 14s | 12.135ms | 12.454ms | 82.41 | `[1,699,4]` |
+| 15s | 13.199ms | 13.566ms | 75.76 | `[1,749,4]` |
+| 16s | 14.433ms | 14.801ms | 69.28 | `[1,799,4]` |
+
+**中 profile：2/10/16 秒（最终 `mid_dynamic`）**
+
+| 输入 | mean | p95 | req/s | 输出 shape |
+|------|------|-----|-------|------------|
+| 2s | 3.452ms | 3.465ms | 289.66 | `[1,99,4]` |
+| 3s | 3.645ms | 3.651ms | 274.35 | `[1,149,4]` |
+| 4s | 4.018ms | 4.060ms | 248.89 | `[1,199,4]` |
+| 4.5s | 4.199ms | 4.246ms | 238.17 | `[1,224,4]` |
+| 5s | 4.457ms | 4.497ms | 224.37 | `[1,249,4]` |
+| 6s | 5.070ms | 5.099ms | 197.24 | `[1,299,4]` |
+| 7s | 5.662ms | 5.721ms | 176.61 | `[1,349,4]` |
+| 8s | 6.334ms | 6.370ms | 157.87 | `[1,399,4]` |
+| 9s | 7.028ms | 7.057ms | 142.29 | `[1,449,4]` |
+| 10s | 6.946ms | 6.996ms | 143.98 | `[1,499,4]` |
+| 11s | 8.829ms | 9.089ms | 113.27 | `[1,549,4]` |
+| 12s | 9.897ms | 10.178ms | 101.04 | `[1,599,4]` |
+| 13s | 10.954ms | 11.231ms | 91.29 | `[1,649,4]` |
+| 14s | 11.880ms | 12.187ms | 84.18 | `[1,699,4]` |
+| 15s | 12.904ms | 13.319ms | 77.49 | `[1,749,4]` |
+| 16s | 14.157ms | 14.618ms | 70.64 | `[1,799,4]` |
+
+**宽 profile：2/6/30 秒（对照，不作为最终主路由）**
+
+| 输入 | mean | p95 | req/s | 输出 shape |
+|------|------|-----|-------|------------|
+| 2s | 2.885ms | 2.893ms | 346.63 | `[1,99,4]` |
+| 4s | 3.746ms | 3.776ms | 266.97 | `[1,199,4]` |
+| 5s | 4.216ms | 4.279ms | 237.22 | `[1,249,4]` |
+| 6s | 4.338ms | 4.359ms | 230.53 | `[1,299,4]` |
+| 8s | 7.080ms | 7.129ms | 141.25 | `[1,399,4]` |
+| 10s | 9.116ms | 9.175ms | 109.70 | `[1,499,4]` |
+| 12s | 11.278ms | 11.586ms | 88.67 | `[1,599,4]` |
+| 16s | 16.603ms | 16.830ms | 60.23 | `[1,799,4]` |
+| 18s | 20.036ms | 20.596ms | 49.91 | `[1,899,4]` |
+| 20s | 23.341ms | 23.747ms | 42.84 | `[1,999,4]` |
+| 24s | 30.680ms | 31.411ms | 32.59 | `[1,1199,4]` |
+| 30s | 44.072ms | 44.934ms | 22.69 | `[1,1499,4]` |
+
+**长 profile 对照：16/20/30 秒**
+
+| 输入 | mean | p95 | req/s | 输出 shape |
+|------|------|-----|-------|------------|
+| 16s | 12.963ms | 13.395ms | 77.14 | `[1,799,4]` |
+| 18s | 15.065ms | 15.519ms | 66.38 | `[1,899,4]` |
+| 20s | **15.336ms** | **15.781ms** | **65.21** | `[1,999,4]` |
+| 22s | 19.913ms | 20.606ms | 50.22 | `[1,1099,4]` |
+| 24s | 23.028ms | 23.670ms | 43.43 | `[1,1199,4]` |
+| 26s | 26.002ms | 26.989ms | 38.46 | `[1,1299,4]` |
+| 28s | 28.606ms | 29.517ms | 34.96 | `[1,1399,4]` |
+| 30s | 31.749ms | 32.817ms | 31.50 | `[1,1499,4]` |
+
+**长 profile 对照：16/24/30 秒（最终 `long_dynamic`）**
+
+| 输入 | mean | p95 | req/s | 输出 shape |
+|------|------|-----|-------|------------|
+| 16s | 13.031ms | 13.443ms | 76.74 | `[1,799,4]` |
+| 18s | 15.079ms | 15.633ms | 66.32 | `[1,899,4]` |
+| 20s | 17.028ms | 17.481ms | 58.73 | `[1,999,4]` |
+| 22s | **19.482ms** | **20.142ms** | **51.33** | `[1,1099,4]` |
+| 24s | **19.326ms** | **19.842ms** | **51.74** | `[1,1199,4]` |
+| 26s | **25.270ms** | **26.180ms** | **39.57** | `[1,1299,4]` |
+| 28s | **28.428ms** | **29.209ms** | **35.18** | `[1,1399,4]` |
+| 30s | **31.613ms** | **32.540ms** | **31.63** | `[1,1499,4]` |
+
+宽 2/6/30 profile 在 30 秒需要 44.072ms；将长区间拆为 16/24/30 后降至 31.613ms，改善 **28.3%**。16/20/30 仅在 20 秒明显更快，16/24/30 在 22～30 秒的多数长尾点更优；考虑长尾只占约 5%、避免再增加一套 engine/context 常驻显存，最终选择 16/24/30 作为统一 long route。若未来 20 秒形成明显流量峰，再按真实 histogram 评估增加 16/20/30 route，而不是仅凭单点速度增加复杂度。
+
+#### 5.9.2 最终多 engine 时长路由
+
+| 原始时长 | 执行路径 | 实际输入 | 原因 |
+|----------|----------|----------|------|
+| `(0,2s)` | dynamic 2/6/16 | 只补到 2s | profile 最小 shape；仍只做一次 forward |
+| `[2s,7s]` | dynamic 2/6/16 | 原始长度/1s bucket | opt=6 对短输入最快 |
+| `(7s,8s]` | dynamic 2/10/16 | 原始长度/1s bucket | 8s 点优于 opt=6 profile |
+| `(8s,10s]` | fixed10 | 补到 10s | fixed10 mean 6.283ms，优于 dynamic 10s |
+| `(10s,12s]` | dynamic 2/10/16 | 原始长度/1s bucket | 避免补到 16s |
+| `(12s,16s]` | fixed16 | 补到 16s | fixed16 mean 10.741ms，优于 dynamic 14～16s；13s 也接近且 p95 更稳 |
+| `(16s,30s]` | dynamic 16/24/30 | 原始长度/1s bucket | 单模型单次 forward；长区间专用 tactics |
+| `>30s` | 独立 ORT CUDA dynamic-shape overflow；或明确绝对上限后新增 TRT overflow profile | 原始长度 | 不能用有界到 30s 的 TRT profile；禁止静默截断、切窗或拆分 |
+
+最终常驻 5 个 route：`short_dynamic`、`mid_dynamic`、`fixed10`、`fixed16`、`long_dynamic`。engine 只反序列化一次；**4 个持久 worker** 各自为每个 route 持有独立 execution context、CUDA stream、pinned host buffer 与 device buffer。请求按预计 GPU 毫秒做 least-outstanding-work 分配，而不是简单按请求数轮询。1～8 worker 同分布扫描确认 4 workers 是吞吐、尾延迟与显存的综合最优点；warmup 后常驻显存约 **6151 MiB**，远低于 L4 24GB。8 workers 增至 11333 MiB 且吞吐回退，因此不采用。
+
+#### 5.9.3 代表性 A/B 50 并发混合时长实测
+
+一个 50 请求 burst 无法精确表达 5%（即 2.5 条）长尾，因此使用 A/B 两种 manifest 各执行 10 轮，总计 20 个 burst、1000 请求：
+
+| Manifest | 50 条时长组成 | 均值 / 中位数 | `>16s` | burst mean / p95 | 请求完成 p50 / p95 | 吞吐 |
+|----------|---------------|---------------|--------|--------------------|----------------------|------|
+| A | `1×4, 2×6, 3×8, 4.5×8, 5×7, 6×5, 8×5, 10×3, 12×2, 18×1, 22×1` | 5.50s / 4.5s | 2 条，4% | 238.201 / 245.737ms | 152.147 / 233.385ms | **209.907 req/s** |
+| B | `1×4, 2×6, 3×8, 4.5×8, 5×7, 6×5, 8×4, 10×3, 12×2, 18×1, 22×1, 26×1` | 5.86s / 4.5s | 3 条，6% | 261.920 / 268.850ms | 172.463 / 255.823ms | **190.898 req/s** |
+| **A+B 聚合（4 workers）** | 1000 请求 | **5.68s / 4.5s** | **50 条，5%** | **250.060 / 265.993ms** | **164.444 / 245.640ms** | **199.952 req/s** |
+
+每个 manifest 用 LPT（按预计 GPU ms 降序、贪心放到累计工作量较小的 worker）预分配到 4 个 worker，以减少长任务集中到同一队列。真实在线服务不知道未来完整 burst，使用“选择当前 outstanding GPU work 最少的 worker”得到同类效果。新扫描 JSON 直接在 `aggregate_requests.requests_per_second` 中记录聚合吞吐 **199.951736 req/s**，不是把 A/B 两个独立吞吐做算术平均。旧 generic 2-worker JSON 的 184.924 req/s 保留为首轮历史记录，不再作为生产容量结论。
+
+同一 A/B、每档 10 轮、每档 1000 请求的 worker 扫描如下：
+
+| Workers | aggregate RPS | burst mean | burst p95 | request p50 | request p95 | warmup 后显存 | 判断 |
+|---------|---------------|------------|-----------|-------------|-------------|----------------|------|
+| 1 | 146.001 | 342.463ms | 357.416ms | 228.477ms | 340.748ms | 2267 MiB | 并行度不足 |
+| 2 | 185.865 | 269.012ms | 280.653ms | 182.211ms | 264.762ms | 3561 MiB | 明显提升，但未到最优 |
+| 3 | **200.119** | **249.851ms** | 271.515ms | 170.689ms | 253.369ms | 4857 MiB | RPS 最高，但仅比4w高0.084%，尾延迟更差 |
+| **4** | **199.952** | **250.060ms** | **265.993ms** | **164.444ms** | **245.640ms** | **6151 MiB** | **生产选择** |
+| 5 | 193.444 | 258.472ms | 267.187ms | 167.539ms | 254.093ms | 7447 MiB | 开始争用 |
+| 6 | 185.196 | 269.985ms | 285.220ms | 175.391ms | 262.857ms | 8741 MiB | 回退 |
+| 7 | 180.318 | 277.288ms | 303.522ms | 180.647ms | 272.363ms | 10039 MiB | p95 明显恶化 |
+| 8 | 188.136 | 265.765ms | 281.671ms | 171.162ms | 258.133ms | 11333 MiB | SM/L2/DRAM/context 争用，回退 |
+
+3 workers 的吞吐 200.119 RPS 相比 4 workers 的 199.952 RPS 只高 **0.084%**，小于这类 GPU burst benchmark 的正常运行波动；但 4 workers 的 burst p95 从 271.515ms 降至 **265.993ms**，请求完成 p95 从 253.369ms 降至 **245.640ms**，同时 request p50 也从 170.689ms 降至 **164.444ms**。因此“最优”按生产的吞吐近似相同、尾延迟更低原则选择 4 workers，而不是机械选择 RPS 小数点最高的 3 workers。5～8 workers 继续增加 context 和显存，却没有容量收益，说明已进入 SM/L2/DRAM/context 调度争用区。
+
+与 50 条全部补到固定 16s 的最终 pinned 双 context 基线相比：
+
+| 方案 | burst mean | burst p95 | 请求完成 p95 | 吞吐 |
+|------|------------|-----------|----------------|------|
+| 全部补 16s（历史最坏基线） | 543.935ms | 547.260ms | 522.152ms | 91.923 req/s |
+| **按真实分布、多 engine、4 workers** | **250.060ms** | **265.993ms** | **245.640ms** | **199.952 req/s** |
+| 改善 | **54.03%** | **51.40%** | **52.96%** | **2.175×** |
+
+因此，平均 5～6 秒的流量不应全部补到 16 秒。按本次代表性分布，时长路由加 4-worker 调度把 GPU 单请求成本约降低 **54.03%**。生产不按满载 199.952 req/s 运行；取 80% 利用率并向下取整，单 L4 建议 admission **159 req/s**。该数字只适用于本节 A/B 分布、当前五 route 和 4-worker 配置；线上 histogram 漂移时必须按 GPU work unit 重算，而不是继续使用固定请求数上限。
+
+#### 5.9.4 GPU work-unit admission 与 30 秒之外的请求
+
+定义 `1 WU = 10.741ms`，即一条固定 16 秒 FP16 请求的 mean GPU 工作量。每条请求在入队前按选中 route 的已测 `p95_gpu_ms / 10.741` 计费；没有精确测点时向上取相邻 bucket，不用音频秒数直接代替 GPU 成本。调度器同时执行：
+
+1. `inflight_requests <= 50`；这是连接/请求数量上限。
+2. `outstanding_work_units <= 50`；防止 50 条长尾请求伪装成与 50 条短请求相同的负载。
+3. 1 秒滑窗/令牌桶控制 admitted WU；当前 A/B 分布下对应 **159 req/s** 的 80% 生产预算。
+4. 4 个 worker 中选择 outstanding WU 较小者；超过任一门槛时排队、返回 429/RESOURCE_EXHAUSTED，或转发第二张 L4。
+5. 记录 duration bucket、route、queue_ms、gpu_ms、outstanding WU、拒绝数和 overflow 次数；流量分布变化后用实测 p95 表更新权重。
+
+30 秒专点由 16/24/30 profile 完成一次 forward：输入 `[1,1,480000]`，输出 **`[1,1499,4]`**，mean/p95 **31.613/32.540ms**。这证明了 TensorRT 主路由的 30 秒边界 shape 和性能，不等于用真实业务样本验证了 `P99.9=30s`，也不表示 30 秒是绝对最大值。当前没有给出绝对时长上限，因此无法构建一个有界且覆盖所有输入的 TensorRT profile。若服务契约必须接受那不超过 0.1% 的 `>30s` 请求，必须保持原长、同一模型、单次 forward，先送到独立 `diarizen` 环境的 ORT CUDA dynamic-shape overflow；确认绝对上限及显存后，才可新增低频 TensorRT overflow profile。任何静默截断、切窗或拆分都违反本轮约束。
+
+#### 5.9.5 30 秒 synthetic parity
+
+普通 30 秒 harmonic synthetic 在 **ORT CUDA FP32** 和 TensorRT FP16 上均输出 5996 个零 cell，cell/frame exact 都是 **100%**。这只能证明全零边界一致。为覆盖非零类别，又将既有 10 秒 adversarial synthetic 波形重复 3 次形成 30 秒输入；它仍是人工输入，不是真实音频：
+
+| 30 秒输入 | ORT CUDA FP32 正类 | TRT FP16 正类 | cell exact | frame exact | mismatch |
+|-----------|---------------|---------------|------------|-------------|----------|
+| harmonic synthetic | 0 / 5996 | 0 / 5996 | 100% | 100% | 0 cell / 0 frame |
+| adversarial synthetic（10s 非零样本重复 3 次） | 921 / 5996 | 929 / 5996 | **99.766511%** | **99.199466%** | 14 cells / 12 frames |
+
+这说明 long 16/24/30 TensorRT FP16 engine 在 30 秒非零 hard-output synthetic 上与 ORT CUDA FP32 高度接近，但并非完全一致。该输入由梯度生成样本重复得到，不能外推真实语音的 DER/JER，也不能替代上线前真实音频验收。
 
 ---
 
@@ -557,8 +741,10 @@ TensorRT FP16 基线
 
 | 问题 | 影响 | 临时规避 |
 |------|------|----------|
-| ORT CUDA EP 长音频 `rel_attn Gather` 报错 | 部分 >60s 音频无法用 CUDA EP | 精度评估改用 CPU EP；或拆分短窗 |
+| ORT CUDA EP 历史超长音频 `rel_attn Gather` 报错 | `>30s` overflow 在未明确绝对上限时仍有兼容/显存风险 | 服务契约禁止切窗；先对 overflow 原长单次 forward 做 CUDA preflight，CUDA 失败则整条请求回退 ORT CPU；明确绝对上限后另建 TRT overflow profile |
 | PyTorch GPU 长音频 OOM | 284s 音频 attention 显存爆炸 | 精度参考用 CPU FP32 |
+| 主 TensorRT long profile 只到 30s | 不能接收未知上限的任意 shape | 30s 不是绝对最大；`>30s` 保持原长、同模型单次 forward，走独立 ORT CUDA/CPU overflow，绝不静默截断、切窗或拆分 |
+| 新增 2～30s 仅 synthetic | 性能、shape 和 synthetic parity 不能代表真实 DER/JER | 上线前仍需真实业务音频精度验收；当前报告明确不外推 |
 | L4 TensorRT 10.0.1 FP16 builder 段错误 | 旧环境无法生成 FP16 engine | **已解决**：独立 Conda env `diarizen-trt1010` 使用 10.10.0.31；原 venv 备份保留 |
 | FP8 普通网络类型推导失败 | 非 INT8 Q/DQ 无法构建 | **已解决**：量化 engine 使用 `STRONGLY_TYPED`，由 Q/DQ/ONNX 类型决定精度 |
 | L4 INT8 bs=50 OOM | INT8 最大实测 batch 为 32 | L4 上限制 batch≤32；不要因模型体积变小假设运行显存也更小 |
@@ -571,7 +757,7 @@ TensorRT FP16 基线
 ## 10. 推荐生产配置
 
 ```yaml
-# 分割模型 serving 推荐配置（基于 2026-08-27 L4 实测）
+# 分割模型 serving 推荐配置（基于 2026-08-27 L4 synthetic 实测）
 backend: tensorrt
 tensorrt_version: 10.10.0.31
 conda_env: /root/miniforge3/envs/diarizen-trt1010
@@ -579,25 +765,41 @@ precision: fp16_mixed
 model: epoch_0016_multilabel_hard.onnx
 input_dtype: float32
 sample_rate: 16000
-max_audio_seconds: 16
+
+traffic_contract:
+  mean_audio_seconds: 5_to_6
+  median_audio_seconds: slightly_above_4
+  percent_above_16s: approximately_5
+  p99_9_seconds: at_most_30
+  absolute_max_seconds: unknown
+  one_segmentation_forward_per_request: true
+  forbidden: [windowing, splitting, silent_truncation]
 
 engines:
-  dynamic_2s_16s: trt_l4_trt1010_dynamic/segmentation_bs1_2s-16s_opt10s_fp16.plan
+  short_dynamic_2s_6s_16s: trt_l4_trt1010_dynamic/segmentation_bs1_2s-16s_opt6s_fp16.plan
+  mid_dynamic_2s_10s_16s: trt_l4_trt1010_dynamic/segmentation_bs1_2s-16s_opt10s_fp16.plan
   fixed_10s: trt_l4_trt1010/segmentation_10s_bs1_fp16.plan
   fixed_16s: trt_l4_trt1010_16s/segmentation_16s_bs1_fp16.plan
+  long_dynamic_16s_24s_30s: trt_l4_trt1010_dynamic/segmentation_bs1_16s-30s_opt24s_fp16.plan
 
 duration_router:
-  - "duration < 2s: pad to 2s -> dynamic_2s_16s"
-  - "2s <= duration <= 8s: ceil to 1s bucket -> dynamic_2s_16s"
+  - "0s < duration < 2s: pad to 2s -> short_dynamic_2s_6s_16s"
+  - "2s <= duration <= 7s: ceil to 1s bucket -> short_dynamic_2s_6s_16s"
+  - "7s < duration <= 8s: ceil to 1s bucket -> mid_dynamic_2s_10s_16s"
   - "8s < duration <= 10s: pad to 10s -> fixed_10s"
-  - "10s < duration <= 12s: ceil to 1s bucket -> dynamic_2s_16s"
+  - "10s < duration <= 12s: ceil to 1s bucket -> mid_dynamic_2s_10s_16s"
   - "12s < duration <= 16s: pad to 16s -> fixed_16s"
+  - "16s < duration <= 30s: ceil to 1s bucket -> long_dynamic_16s_24s_30s"
+  - "duration > 30s: preserve full duration -> independent ORT CUDA dynamic-shape overflow"
 
 scheduler:
   batch_size: 1
   dynamic_batching: false
-  execution_contexts_per_active_engine: 2
+  persistent_workers: 4
+  execution_contexts_per_engine_per_worker: 1
+  assignment: least_outstanding_gpu_work_units
   max_inflight_requests: 50
+  max_outstanding_work_units: 50
   queue_capacity: 100
   overload: reject_429_or_route_to_second_l4
 
@@ -605,8 +807,8 @@ runtime:
   deserialize_engine_once: true
   buffers: preallocated_pinned_host_and_device_per_context
   streams: one_independent_stream_per_context
-  single_active_context: replay_full_h2d_trt_d2h_cuda_graph
-  queued_burst: dispatch_to_two_preallocated_contexts
+  fixed_shape_single_active_context: replay_full_h2d_trt_d2h_cuda_graph
+  mixed_duration_burst: dispatch_by_estimated_gpu_ms_to_two_workers
   cuda_graph_guard: require_nonzero_node_count_and_exact_enqueue_parity
 
 transport:
@@ -617,21 +819,45 @@ transport:
 
 warmup:
   on_startup: true
-  shapes_seconds: [2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 16]
+  shapes_seconds: [2, 3, 4, 4.5, 5, 6, 7, 8, 10, 11, 12, 16, 18, 20, 22, 24, 26, 28, 30]
 
 fallback:
   backend: onnxruntime
   provider: CUDAExecutionProvider
   deployment: separate_process_in_conda_env_diarizen
+  overflow_gt_30s: preserve_original_shape_and_run_one_forward
+  overflow_cuda_failure: retry_whole_request_with_CPUExecutionProvider
+  future_trt_overflow: build_only_after_absolute_max_is_known
   optional_cuda_graph_iobinding_experimental: true
   secondary_pytorch_experimental_not_auto_enabled: reduce_overhead_compile_sdpa_amp
 
-capacity_guardrail_worst_case_16s:
-  measured_requests_per_second_final_pinned_two_contexts: 91.923
+capacity_guardrail_mixed_distribution:
+  benchmark_requests: 1000
+  mean_audio_seconds: 5.68
+  median_audio_seconds: 4.5
+  percent_above_16s: 5.0
+  measured_equivalent_requests_per_second: 199.952
   target_utilization: 0.8
-  admission_requests_per_second: 73
-  burst_50_total_p95_ms_gpu_only: 547.3
-  burst_50_request_completion_p95_ms_gpu_only: 522.2
+  admission_requests_per_second: 159
+  burst_50_total_mean_ms_gpu_only: 250.060
+  burst_50_total_p95_ms_gpu_only: 265.993
+  burst_50_request_completion_p50_ms_gpu_only: 164.444
+  burst_50_request_completion_p95_ms_gpu_only: 245.640
+  resident_gpu_memory_mib_after_warmup: 6151
+
+work_unit_admission:
+  definition: "1 WU = 10.741ms fixed16 TensorRT FP16 GPU work"
+  request_charge: "selected_route_p95_gpu_ms / 10.741"
+  unknown_duration_bucket: round_up_to_next_measured_bucket
+  max_inflight_requests: 50
+  max_outstanding_work_units: 50
+  update_weights_from_online_histogram: true
+
+historical_all_padded_16s_baseline:
+  requests_per_second: 91.923
+  burst_50_total_mean_ms_gpu_only: 543.935
+  burst_50_total_p95_ms_gpu_only: 547.260
+  burst_50_request_completion_p95_ms_gpu_only: 522.152
 
 avoid:
   - tensorrt_dynamic_batching
@@ -647,11 +873,11 @@ avoid:
   - forced_flash_attention
 ```
 
-服务层应只反序列化一次 engine；每个 context 独占一套 pinned host buffer、CUDA input/output buffer 和 stream，禁止逐请求 `cudaMalloc`。固定 shape/地址初始化后捕获完整 H2D→TensorRT→D2H graph；仅一个槽位活跃时 replay graph，积压时向两个槽位轮转派发。双槽 graph/enqueue 的配对差异约 0.21%，所以不引入难以维护的固定 hybrid 状态机，容量按双槽普通 pinned enqueue 计算。动态输入向上取整到 1 秒 bucket，避免每个任意 sample 数触发 shape 切换。请求传二进制 PCM16，不传 JSON/base64；解码和重采样尽量放上游。服务启动时加载 plan、捕获 graph 并 warmup 所有路由 bucket，健康检查至少验证 2s/10s/16s shape。记录 `decode_ms`、`queue_ms`、`h2d_ms`、`gpu_ms`、`postprocess_ms`、端到端 p50/p95/p99、队列深度、拒绝数和 GPU 显存。
+服务层只反序列化一次 5 个主路由 engine；4 个持久 worker 各为每个 route 独占一套 context、pinned host buffer、CUDA input/output buffer 和 stream，禁止逐请求 `cudaMalloc`、创建 context 或加载 plan。固定 10s/16s shape 可在地址初始化后捕获完整 H2D→TensorRT→D2H graph；混合动态 shape 按 1 秒 bucket warmup，并按预计 GPU work 而不是请求数派发给 outstanding WU 较小的 worker。请求传二进制 PCM16，不传 JSON/base64；解码和重采样尽量放上游。健康检查至少验证 2s/6s/10s/16s/24s/30s，并记录 `duration_bucket`、`route`、`decode_ms`、`queue_ms`、`gpu_ms`、outstanding WU、端到端 p50/p95/p99、队列深度、overflow/拒绝数和 GPU 显存。
 
-`diarizen-trt1010` 中的 ORT 1.18 CUDA provider 会因缺少 `libcudnn.so.8` 回退 CPU，所以 ORT CUDA 回退必须运行在现有 `diarizen` 环境的独立进程/容器，不能在主 TensorRT 进程内假设 CUDA EP 可用。TensorRT plan 与 TRT 版本/GPU 架构绑定；GPU 型号或 TensorRT 大版本变化时从 ONNX 重建。
+`diarizen-trt1010` 中的 ORT 1.18 CUDA provider 会因缺少 `libcudnn.so.8` 回退 CPU，所以普通回退和 `>30s` overflow 必须运行在现有 `diarizen` 环境的独立进程/容器，不能在主 TensorRT 进程内假设 CUDA EP 可用。overflow 必须先保持完整 shape 做一次 ORT CUDA forward；若 CUDA EP 对该超长 shape 失败，则整条请求回退 ORT CPU，不允许把请求拆成窗口。TensorRT plan 与 TRT 版本、GPU 架构和 profile 上限绑定；只有明确业务绝对上限后，才能为 `>30s` 构建新的有界 TRT profile。
 
-最终完整 pinned 链路的 50 条最坏输入总完成 p95 为 547.3ms、请求完成 p95 mean 为 522.2ms，均为 GPU-only，不含网络、音频解码、排队前端和后处理。满载理论成本公式为：`每请求 GPU 成本 ≈ L4 每小时价格 / 330900`；按 73 RPS admission 的生产口径使用 `L4 每小时价格 / 262800`。如果到达率长期低于 73 RPS，一张 L4 是最低成本方案；若硬性要求 50 条同时到达的端到端 p95 显著低于约 0.55s，则必须增加 L4 副本。
+当前 4-worker A/B 混合流量的 50 请求总完成 mean/p95 为 250.060/265.993ms，请求完成 p50/p95 为 164.444/245.640ms，均为 GPU-only，不含网络、音频解码、前端排队和后处理。满载等效吞吐约 199.952 req/s；生产按 159 RPS admission 时，成本口径为 `每请求 GPU 成本 ≈ L4 每小时价格 / 572400`。固定 16s 的 91.923 req/s、543.935ms mean 只保留为全补 16s 历史对照。真实流量时长 histogram、`>30s` overflow 比例或 p95 GPU 权重发生变化时，必须通过 work-unit 预算动态下调请求数 admission；159 RPS 不是脱离分布的永久常数。
 
 ---
 
@@ -861,6 +1087,78 @@ flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 \
   --out-json "$MODEL_DIR/diarizen_attention_fixed16s.json"
 ```
 
+### 11.9 L4 动态 2～30 秒与混合 50 并发
+
+```bash
+MODEL_DIR=inference/models/kaldi_merged_1219_all_ft_large
+ONNX=$MODEL_DIR/epoch_0016_multilabel_hard.onnx
+ENGINE_DIR=$MODEL_DIR/trt_l4_trt1010_dynamic
+RUN="/root/miniforge3/bin/conda run --no-capture-output -n diarizen-trt1010 python"
+
+# short dynamic：2/6/16，逐点含业务中位数4.5s
+flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 $RUN \
+  inference/benchmark_trt_dynamic_duration.py \
+  --onnx "$ONNX" \
+  --engine "$ENGINE_DIR/segmentation_bs1_2s-16s_opt6s_fp16.plan" \
+  --profile-seconds 2,6,16 \
+  --benchmark-seconds 2,3,4,4.5,5,6,7,8,9,10,11,12,13,14,15,16 \
+  --reuse-existing --warmup 10 --repeats 100 \
+  --out-json "$MODEL_DIR/epoch_0016_l4_trt1010_fp16_dynamic_2s-16s_opt6s_detailed_bs1.json"
+
+# mid dynamic：2/10/16
+flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 $RUN \
+  inference/benchmark_trt_dynamic_duration.py \
+  --onnx "$ONNX" \
+  --engine "$ENGINE_DIR/segmentation_bs1_2s-16s_opt10s_fp16.plan" \
+  --profile-seconds 2,10,16 \
+  --benchmark-seconds 2,3,4,4.5,5,6,7,8,9,10,11,12,13,14,15,16 \
+  --reuse-existing --warmup 10 --repeats 100 \
+  --out-json "$MODEL_DIR/epoch_0016_l4_trt1010_fp16_dynamic_2s-16s_opt10s_detailed_bs1.json"
+
+# 宽 profile 对照：2/6/30
+flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 $RUN \
+  inference/benchmark_trt_dynamic_duration.py \
+  --onnx "$ONNX" \
+  --engine "$ENGINE_DIR/segmentation_bs1_2s-30s_opt6s_fp16.plan" \
+  --profile-seconds 2,6,30 \
+  --benchmark-seconds 2,4,5,6,8,10,12,16,18,20,24,30 \
+  --reuse-existing --warmup 10 --repeats 100 \
+  --out-json "$MODEL_DIR/epoch_0016_l4_trt1010_fp16_dynamic_2s-30s_opt6s_bs1.json"
+
+# 两个 long profile 对照；去掉 --reuse-existing 可从 ONNX 重建
+flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 $RUN \
+  inference/benchmark_trt_dynamic_duration.py \
+  --onnx "$ONNX" \
+  --engine "$ENGINE_DIR/segmentation_bs1_16s-30s_opt20s_fp16.plan" \
+  --profile-seconds 16,20,30 --benchmark-seconds 16,18,20,22,24,26,28,30 \
+  --reuse-existing --warmup 10 --repeats 100 \
+  --out-json "$MODEL_DIR/epoch_0016_l4_trt1010_fp16_dynamic_16s-30s_opt20s_bs1.json"
+
+flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 $RUN \
+  inference/benchmark_trt_dynamic_duration.py \
+  --onnx "$ONNX" \
+  --engine "$ENGINE_DIR/segmentation_bs1_16s-30s_opt24s_fp16.plan" \
+  --profile-seconds 16,24,30 --benchmark-seconds 16,18,20,22,24,26,28,30 \
+  --reuse-existing --warmup 10 --repeats 100 \
+  --out-json "$MODEL_DIR/epoch_0016_l4_trt1010_fp16_dynamic_16s-30s_opt24s_bs1.json"
+
+# A/B 各10轮：1000请求，生产最优4 workers，五route单次forward
+flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 $RUN \
+  inference/benchmark_trt_mixed_duration_burst.py \
+  --short-dynamic-engine "$ENGINE_DIR/segmentation_bs1_2s-16s_opt6s_fp16.plan" \
+  --mid-dynamic-engine "$ENGINE_DIR/segmentation_bs1_2s-16s_opt10s_fp16.plan" \
+  --fixed10-engine "$MODEL_DIR/trt_l4_trt1010/segmentation_10s_bs1_fp16.plan" \
+  --fixed16-engine "$MODEL_DIR/trt_l4_trt1010_16s/segmentation_16s_bs1_fp16.plan" \
+  --long-dynamic-engine "$ENGINE_DIR/segmentation_bs1_16s-30s_opt24s_fp16.plan" \
+  --estimate-ms-json '{"2":2.845,"3":3.152,"4.5":3.789,"5":4.074,"6":4.357,"8":6.334,"10":6.283,"12":9.897,"18":15.079,"22":19.482,"26":25.270}' \
+  --workers 4 --warmup-waves 2 --repeats 10 --seed 3407 \
+  --out-json "$MODEL_DIR/epoch_0016_l4_trt1010_fp16_mixed_duration_50concurrency_workers4_bs1.json"
+```
+
+worker 最优点扫描使用完全相同的 engine、estimate、manifest、warmup、repeats 和 seed，只把上面命令的 `--workers 4` 依次替换为 `--workers 1` 到 `--workers 8`，输出文件分别命名为 `..._workers{1..8}_bs1.json`。八档必须用 `flock` 顺序独占 GPU，不能并行执行后比较。
+
+30 秒 parity 使用相同 `segmentation_bs1_16s-30s_opt24s_fp16.plan`、输入 `[1,1,480000]`。普通 harmonic synthetic reference 及 adversarial synthetic（既有 10 秒非零样本重复 3 次）reference 必须先在 `diarizen` 环境的 ORT CUDA FP32 中生成，再在 `diarizen-trt1010` 中执行 TensorRT 对比。为保持审计性，四份 reference/parity JSON 均纳入 12.2 索引；临时 NPZ 位于 `/tmp`，不纳入 git。
+
 ---
 
 ## 12. 产物与脚本索引
@@ -874,7 +1172,8 @@ flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 \
 | `inference/benchmark_tensorrt_fixed10s.py` | 构建固定 shape TensorRT FP32/TF32/FP16/BF16/FP8/INT8/INT4 engines、导出 inspector 并测速 |
 | `inference/benchmark_trt_fixed10s_parity.py` | ORT FP32 reference 与各 TensorRT 精度 hard multilabel synthetic parity |
 | `inference/benchmark_trt_online_burst.py` | 固定 batch=1 engine 的 50 请求、跨 execution context/stream 突发压测 |
-| `inference/benchmark_trt_dynamic_duration.py` | 构建 batch=1、2–16s 动态时长 profile 并逐时长测速 |
+| `inference/benchmark_trt_dynamic_duration.py` | 构建/复用任意给定 min/opt/max 的 batch=1 动态 profile；本轮覆盖 2/6/16、2/10/16、2/6/30、16/20/30、16/24/30 并逐点测速 |
+| `inference/benchmark_trt_mixed_duration_burst.py` | A/B 混合时长各 50 请求、1～8 worker 全扫描、五 route、按预计 GPU ms 平衡的 1000 请求突发 benchmark |
 | `inference/generate_adversarial_synthetic_10s.py` | 生成能激活正类的 10 秒 adversarial synthetic waveform |
 | `inference/diagnose_tensorrt_build.py` | TensorRT 最小网络、ONNX parse、FP32/FP16 build 隔离诊断 |
 | `inference/quantize_segmentation_modelopt.py` | ModelOpt FP8/INT8 explicit Q/DQ 与 INT4 weight-only 图生成 |
@@ -890,6 +1189,8 @@ flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 \
 | `inference/benchmark_pytorch_compile_fixed16s.py` | PyTorch eager/AMP/SDPA、三种 compile mode 及两种真实 compile+SDPA 组合的固定 16s 对照 |
 | `inference/benchmark_attention_sdpa_fixed16s.py` | WavLM/Conformer attention manual/auto/forced-Flash 微基准 |
 | `inference/tests/test_benchmark_l4_runtime_acceleration.py` | runtime benchmark 的统计、graph 判定和参数单元测试 |
+| `inference/tests/test_benchmark_trt_dynamic_duration.py` | 动态 profile shape/参数校验单元测试 |
+| `inference/tests/test_benchmark_trt_mixed_duration_burst.py` | manifest、时长路由、work estimate 与 LPT 分配单元测试 |
 | `inference/quantize_segmentation_onnx_static.py` | Static INT8 QDQ 量化 |
 | `inference/run_export_kaldi_merged_1219_all_ft_large_epoch_0002.sh` | ONNX 导出 |
 
@@ -913,7 +1214,19 @@ flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 \
 | `epoch_0016_l4_trt1010_fp16_16s_burst50.json` | 50 个 16s 请求在 1/2/4/8 contexts 下的完成延迟与吞吐 |
 | `epoch_0016_l4_trt1010_fp16_16s_burst50_memory.json` | 1/2 contexts 的短复测与设备内存占用 |
 | `epoch_0016_l4_trt1010_fp16_dynamic_duration_bs1.json` | batch=1 动态 2–16s profile 的逐时长结果 |
+| `epoch_0016_l4_trt1010_fp16_dynamic_2s-16s_opt6s_bs1.json` | short 2/6/16 profile 的首轮逐点结果 |
+| `epoch_0016_l4_trt1010_fp16_dynamic_2s-16s_opt6s_detailed_bs1.json` | short 2/6/16 profile 的 2/3/4/4.5/5～16s 详细结果 |
+| `epoch_0016_l4_trt1010_fp16_dynamic_2s-16s_opt10s_detailed_bs1.json` | mid 2/10/16 profile 的 2/3/4/4.5/5～16s 详细结果 |
+| `epoch_0016_l4_trt1010_fp16_dynamic_2s-30s_opt6s_bs1.json` | 单一宽 2/6/30 profile 对照，证明宽 profile 的长区间 tactics 明显较差 |
+| `epoch_0016_l4_trt1010_fp16_dynamic_16s-30s_opt20s_bs1.json` | long 16/20/30 profile 的 16～30s 逐点结果 |
+| `epoch_0016_l4_trt1010_fp16_dynamic_16s-30s_opt24s_bs1.json` | 最终 long 16/24/30 profile 的 16～30s 逐点结果和 30s shape |
+| `epoch_0016_l4_trt1010_fp16_mixed_duration_50concurrency_bs1.json` | 首轮 generic 2-worker A/B 混合时长历史结果；不再作为生产最优口径 |
+| `epoch_0016_l4_trt1010_fp16_mixed_duration_50concurrency_workers{1..8}_bs1.json` | 同一 A/B 分布的完整 worker 扫描；包含每档 1000 请求、aggregate RPS/延迟、A/B 分项、worker 分配及显存快照；workers4 为生产口径 |
 | `epoch_0016_l4_ort_fp32_synthetic16s_reference.json` | 固定 16s ORT CPU FP32 synthetic reference 元数据 |
+| `epoch_0016_l4_ort_fp32_synthetic30s_reference.json` | 30s harmonic synthetic ORT CUDA FP32 全零 reference |
+| `epoch_0016_l4_trt1010_fp16_dynamic30s_parity.json` | 30s harmonic synthetic TRT FP16 vs ORT，cell/frame 100% exact |
+| `epoch_0016_l4_ort_fp32_adversarial_synthetic30s_reference.json` | 既有 10s adversarial synthetic 重复 3 次后的 30s ORT FP32 非零 reference |
+| `epoch_0016_l4_trt1010_fp16_dynamic30s_adversarial_parity.json` | 30s 非零 adversarial synthetic TRT vs ORT：cell 99.766511%、frame 99.199466% |
 | `epoch_0016_l4_runtime_acceleration_fixed16s.json` | TensorRT 预分配、pinned I/O 与有效 CUDA Graph 的 200 次配对结果 |
 | `epoch_0016_l4_trt_production_runner_fixed16s.json` | 独立 libcudart 完整数据链路 graph 的节点、延迟、host enqueue 与 parity |
 | `epoch_0016_l4_trt_builder_search_fixed16s.json` | O3/O4/O5、8/16GiB workspace、aux stream 搜索与选型 |
@@ -936,7 +1249,9 @@ flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 \
 | `epoch_0016_multilabel_hard.modelopt-int4-trt.onnx` | 约 136 MB，128 个 INT4 DQ 权重 |
 | `trt_l4_trt1010/segmentation_10s_bs{1,4,8,32}_fp16.plan` | 164–385 MB |
 | `trt_l4_trt1010_16s/segmentation_16s_bs{1,2,4,8,16,32}_fp16.plan` | 163–502 MiB；生产只需 bs=1 |
-| `trt_l4_trt1010_dynamic/segmentation_bs1_2s-16s_opt10s_fp16.plan` | 153.7 MiB；动态时长、固定 batch=1 |
+| `trt_l4_trt1010_dynamic/segmentation_bs1_2s-16s_opt{6,10}s_fp16.plan` | 约 153 MiB/个；最终 short/mid dynamic，固定 batch=1 |
+| `trt_l4_trt1010_dynamic/segmentation_bs1_2s-30s_opt6s_fp16.plan` | 150.5 MiB；宽 profile 对照，不作为最终主路由 |
+| `trt_l4_trt1010_dynamic/segmentation_bs1_16s-30s_opt{20,24}s_fp16.plan` | 约 152～154 MiB/个；opt24 为最终 long route，opt20 保留对照 |
 | `trt_l4_precisions/segmentation_10s_bs{1,4,8,32}_{fp32_tf32,fp32,bf16,fp8,int8,int4}.plan` | 多精度 engines 与 inspector JSON |
 
 ---
@@ -945,19 +1260,22 @@ flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 \
 
 ### 13.1 结论
 
-1. **L4 固定 10s 性能首选**：TensorRT 10.10 FP16；ORT CUDA FP32 保留为生产回退。
-2. **L4 固定 10s 实测**：bs=1/8/32/50 为 **20.5/163.0/748.7/1184.2 ms**；bs=50 约为 A800 的 5.1× 延迟。
-3. **L4 ORT INT8 不可取**：dynamic/static 均慢于 FP32，且 bs=50 OOM；全静音/噪声 synthetic 100% 一致不代表真实音频精度可接受。
-4. **TensorRT FP16 问题已解决**：10.0.1 的 builder 段错误通过独立升级到 10.10.0.31 解决；四个固定 shape engine 全部成功。
-5. **TensorRT FP16 是全精度实测冠军**：FP8/INT8 确实命中低精度层，但分别慢约 11–26% / 3–13%；INT8 synthetic 精度严重失真且重复执行非完全确定。
-6. **INT4/FP4 不适合 L4**：INT4 仅压缩部分权重、实际 Float 计算且更慢；FP4 需要 Blackwell，Ada L4 不支持。
-7. **线上最长 16s 时仍选 FP16 batch=1**：10.741ms/条；batch=32 每条 17.021ms，吞吐反而下降 36.9%。
-8. **并发 50 使用两个 contexts**：最终完整 pinned 链路 50 条总完成 mean/p95 约 543.9/547.3ms，请求完成 p95 约 522.2ms，吞吐约 91.9 req/s；4/8 contexts 更慢。
-9. **一张 L4 是最低成本起点**：admission 向下取整为 73 个最坏 16s 请求/秒；更高持续到达率或更低突发 p95 SLA 才扩卡。
-10. **时长路由避免无谓补零**：动态 2–16s plan 配合固定 10s/16s plan；不使用大 batch 或当前 INT8/FP8/INT4 路线。
-11. **CUDA Graph 有小而稳定的单槽收益**：完整 16s 数据链路 mean/p95 改善约 2.6%/2.9%，host enqueue 降至约 8µs；双槽六模式差异约 0.21%，不采用复杂 hybrid 调度。
-12. **builder 深搜没有更好 plan**：O4/O5、16GiB workspace、aux streams 均未同时改善 mean/p95；继续使用 O3/8GiB。
-13. **非 TensorRT 路径也已测完**：ORT CUDA Graph 只改善 2.09% 且仍慢 3.54×；真正的 PyTorch reduce-overhead+SDPA+AMP 比 eager AMP 快 2.12×，但仍慢 1.72×。二者都是可选/实验性回退，不是主后端；全零 hard parity 不能替代真实验收。
+1. **当前业务不是最长 16s 的固定负载**：生产口径已改为平均 5～6s、中位数 4 秒多、约 5% `>16s`、99.9% `<=30s`；固定 16s 数据仅保留为全补零历史对照。
+2. **所有时长坚持单次 segmentation forward**：16～30s TensorRT 以及 `>30s` overflow 都禁止切窗、拆分或静默截断。
+3. **主后端仍是 TensorRT 10.10 FP16 batch=1**：在 L4 实测的 FP32/TF32/FP16/BF16/FP8/INT8/INT4 中 FP16 最快；动态合批和大 batch 继续禁用。
+4. **最终采用五 route**：short dynamic 2/6/16、mid dynamic 2/10/16、fixed10、fixed16、long dynamic 16/24/30；宽 2/6/30 在 30s 慢至 44.072ms，不适合作为单一万能 engine。
+5. **30 秒单次 TensorRT forward 已验证**：long 16/24/30 的 mean/p95 为 **31.613/32.540ms**，输出 `[1,1499,4]`；普通全零 synthetic 与 ORT 100% exact。
+6. **30 秒非零 synthetic 高度接近但非完全一致**：adversarial synthetic 的 cell/frame exact 为 **99.766511%/99.199466%**，14 cells/12 frames mismatch；人工样本不能外推真实 DER/JER。
+7. **A/B 混合并发与目标分布一致**：20 个 burst、1000 请求的平均/中位时长为 **5.68/4.5s**，`>16s` 恰为 5%；4-worker aggregate burst mean/p95 **250.060/265.993ms**，请求完成 p50/p95 **164.444/245.640ms**。
+8. **4 workers 是同分布生产最优点**：1～8 workers 已全部扫描；3 workers 虽以 200.119 RPS 比 4 workers 高 0.084%，但属于噪声级，且 4 workers 的 burst/request p95 分别更低 5.522/7.729ms。5～8 workers进入争用区；生产仍按4-worker 199.952 RPS，以80%向下取整为 **159 req/s**。
+9. **按时长路由比全补 16s 成本减半**：历史固定 16s 双 context pinned 为 91.923 req/s、543.935ms mean；当前混合路由吞吐约 **2.175×**，burst mean/GPU 单请求成本约改善 **54.03%**。
+10. **admission 必须用 GPU work unit**：`1 WU=10.741ms`，请求按选中 route 的 p95 GPU 时间计费；同时限制 `inflight_requests<=50`、`outstanding_WU<=50`，并按 worker 当前 outstanding WU 派发。
+11. **当前五 route、4 workers 常驻显存约 6151 MiB**：engine/context/buffer 全部预分配；8 workers 增至 11333 MiB 且更慢，禁止逐请求反序列化、创建 context 或 `cudaMalloc`。
+12. **30s 不是绝对最大**：`99.9%<=30s` 只是分布边界。未知绝对上限时无法建立覆盖全部请求的有界 TRT profile；低频 `>30s` 必须保持原长走独立 ORT CUDA/CPU 单次 forward，或明确绝对上限后新增 TRT overflow profile。
+13. **CUDA Graph 仍是固定 shape 的小收益项**：完整 16s 单槽 mean/p95 改善约 2.6%/2.9%，host enqueue 降至约 8µs；双槽六模式差异约 0.21%，不采用复杂 hybrid 状态机。
+14. **builder 深搜没有更好固定 16s plan**：O4/O5、16GiB workspace、aux streams 均未同时改善 mean/p95；固定 16s 继续使用 O3/8GiB。
+15. **ORT/PyTorch 是回退而非主后端**：ORT CUDA Graph 仅改善 2.09%；PyTorch reduce-overhead+SDPA+AMP 比 eager AMP 快 2.12×但仍慢于 TRT。`>30s` ORT overflow 必须在独立 `diarizen` 环境运行。
+16. **所有新增 2～30s 结果仍只来自 synthetic**：当前结论可用于性能、容量、shape 和路由设计，不能替代真实音频准确率验收。
 
 ### 13.2 收尾状态与外部约束
 
@@ -969,12 +1287,16 @@ flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 \
 | CUDA stream 正确性 | ✅ 完成 | parity/validation/benchmark 均加入跨 stream 同步；验证增加 warmup 与 repeat exact |
 | 固定 16s 容量与 batch 扫描 | ✅ 完成 | FP16 bs=1/2/4/8/16/32，均 50 次计时 |
 | 并发 50 调度扫描 | ✅ 完成 | batch=1 的 1/2/4/8 contexts；2 contexts 最佳 |
-| 动态时长与路由切点 | ✅ 完成 | 2/4/6/8/10/12/13/14/16s synthetic 测速 |
+| 动态时长与路由切点 | ✅ 完成 | 2/6/16、2/10/16、2/6/30、16/20/30、16/24/30 五个 profile 逐点 synthetic 测速 |
+| 16～30s 单次 forward | ✅ 完成 | 18/20/22/24/26/28/30s 均由同一 segmentation 模型单次执行；30s 输出 `[1,1499,4]` |
+| A/B 混合 50 并发 | ✅ 完成 | 1～8 worker 各 20 bursts、1000 请求；4 workers 尾延迟最优且吞吐与3w相同量级，生产 admission 159 req/s |
+| 30s synthetic parity | ✅ 完成 | 全零 100% exact；非零 adversarial cell/frame 99.766511%/99.199466%，不能外推真实 DER |
 | TensorRT runtime / CUDA Graph | ✅ 完成 | 16s enqueue/pinned/graph、独立 libcudart runner、graph 节点与 exact parity |
 | TensorRT builder/tactic 搜索 | ✅ 完成 | O3/O4/O5、8/16GiB、aux=0/2；没有候选替换现有 plan |
 | ORT / PyTorch / SDPA 加速 | ✅ 完成 | 16s ORT CUDA Graph、PyTorch AMP/SDPA/compile 和 attention kernel 微基准 |
 | 双 context graph/hybrid 复核 | ✅ 完成 | 6 种模式同轮正逆序交错；差异约 0.21%，不宣称 hybrid 收益 |
-| 真实音频 DER/JER | 按约束不执行 | 用户最终口径为只跑固定 16 秒 synthetic，不跑真实音频 |
+| 真实音频 DER/JER | 按约束不执行 | 用户最终口径为只跑 synthetic，不跑真实音频；范围已从固定16s扩至动态2～30s |
+| `>30s` TensorRT overflow profile | 等待绝对上限 | 99.9%<=30s 不等于绝对最大30s；上限未知时先由独立 ORT CUDA/CPU 保持原长单次 forward |
 | SmoothQuant alpha 扫描 | 当前工具链不具备 | ModelOpt 0.46 ONNX 无 SmoothQuant；需要新增图变换或训练工具链，且普通 INT8 已精度失败并非确定 |
 | 部署镜像/注册表推送 | 无目标可执行 | 尚未提供镜像仓库、服务入口或部署目标；环境脚本与 engines 已就绪 |
 

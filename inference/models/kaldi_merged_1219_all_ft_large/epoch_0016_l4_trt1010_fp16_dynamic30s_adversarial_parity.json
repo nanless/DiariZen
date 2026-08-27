@@ -1,0 +1,50 @@
+{
+  "backend": "TensorRT fp16",
+  "tensorrt_version": "10.10.0.31",
+  "gpu": "NVIDIA L4",
+  "batches": {
+    "1": {
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_dynamic/segmentation_bs1_16s-30s_opt24s_fp16.plan",
+      "engine_profile": {
+        "min": [
+          1,
+          1,
+          256000
+        ],
+        "opt": [
+          1,
+          1,
+          384000
+        ],
+        "max": [
+          1,
+          1,
+          480000
+        ]
+      },
+      "input_shape": [
+        1,
+        1,
+        480000
+      ],
+      "output_shape": [
+        1,
+        1499,
+        4
+      ],
+      "cell_exact_match_pct": 99.766511,
+      "frame_exact_match_pct": 99.199466,
+      "mismatched_cells": 14,
+      "mismatched_frames": 12,
+      "max_abs_diff": 1.0,
+      "actual_value_counts": {
+        "0.0": 5067,
+        "1.0": 929
+      },
+      "reference_value_counts": {
+        "0.0": 5075,
+        "1.0": 921
+      }
+    }
+  }
+}

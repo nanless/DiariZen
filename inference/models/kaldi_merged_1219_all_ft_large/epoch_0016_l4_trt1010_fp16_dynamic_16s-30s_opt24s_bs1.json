@@ -1,0 +1,195 @@
+{
+  "backend": "TensorRT FP16 dynamic duration, fixed batch=1",
+  "tensorrt_version": "10.10.0.31",
+  "profile_seconds": {
+    "min": 16.0,
+    "opt": 24.0,
+    "max": 30.0
+  },
+  "actual_profile": {
+    "min": {
+      "shape": [
+        1,
+        1,
+        256000
+      ],
+      "seconds": 16.0
+    },
+    "opt": {
+      "shape": [
+        1,
+        1,
+        384000
+      ],
+      "seconds": 24.0
+    },
+    "max": {
+      "shape": [
+        1,
+        1,
+        480000
+      ],
+      "seconds": 30.0
+    }
+  },
+  "warmup": 10,
+  "repeats": 100,
+  "build_seconds": 191.651,
+  "engine_bytes": 161178076,
+  "engine_device_memory_bytes": 487787008,
+  "onnx": {
+    "path": "inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_multilabel_hard.onnx",
+    "bytes": 278737023,
+    "sha256": "114ac3c37deb04b47deeeb50c2f5aff981cd4702d23b9df9b0bfe3ba07f85969"
+  },
+  "engine": {
+    "path": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_dynamic/segmentation_bs1_16s-30s_opt24s_fp16.plan",
+    "bytes": 161178076,
+    "sha256": "2fc71805d0d710164a6db0f98368ac24e1c1ebacf047318e61e9ef9bcccd1868"
+  },
+  "environment": {
+    "python": "3.10.18 | packaged by conda-forge | (main, Jun  4 2025, 14:45:41) [GCC 13.3.0]",
+    "platform": "Linux-5.4.250-9-velinux1-amd64-x86_64-with-glibc2.31",
+    "gpu": "NVIDIA L4",
+    "gpu_uuid": "GPU-841c039c-20c0-5e12-c07c-9375d60a6e38",
+    "driver_version": "535.129.03",
+    "gpu_memory_total_mib": 23034,
+    "torch": "2.3.1+cu121",
+    "torch_cuda": "12.1",
+    "compute_capability": [
+      8,
+      9
+    ],
+    "tensorrt": "10.10.0.31"
+  },
+  "results": [
+    {
+      "input_seconds": 16.0,
+      "input_samples": 256000,
+      "mean_ms": 13.031,
+      "p50_ms": 12.943,
+      "p95_ms": 13.443,
+      "requests_per_second": 76.74,
+      "audio_seconds_per_second": 1227.8,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          799,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 18.0,
+      "input_samples": 288000,
+      "mean_ms": 15.079,
+      "p50_ms": 14.965,
+      "p95_ms": 15.633,
+      "requests_per_second": 66.32,
+      "audio_seconds_per_second": 1193.7,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          899,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 20.0,
+      "input_samples": 320000,
+      "mean_ms": 17.028,
+      "p50_ms": 16.911,
+      "p95_ms": 17.481,
+      "requests_per_second": 58.73,
+      "audio_seconds_per_second": 1174.6,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          999,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 22.0,
+      "input_samples": 352000,
+      "mean_ms": 19.482,
+      "p50_ms": 19.35,
+      "p95_ms": 20.142,
+      "requests_per_second": 51.33,
+      "audio_seconds_per_second": 1129.3,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          1099,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 24.0,
+      "input_samples": 384000,
+      "mean_ms": 19.326,
+      "p50_ms": 19.308,
+      "p95_ms": 19.842,
+      "requests_per_second": 51.74,
+      "audio_seconds_per_second": 1241.8,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          1199,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 26.0,
+      "input_samples": 416000,
+      "mean_ms": 25.27,
+      "p50_ms": 25.155,
+      "p95_ms": 26.18,
+      "requests_per_second": 39.57,
+      "audio_seconds_per_second": 1028.9,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          1299,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 28.0,
+      "input_samples": 448000,
+      "mean_ms": 28.428,
+      "p50_ms": 28.34,
+      "p95_ms": 29.209,
+      "requests_per_second": 35.18,
+      "audio_seconds_per_second": 985.0,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          1399,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 30.0,
+      "input_samples": 480000,
+      "mean_ms": 31.613,
+      "p50_ms": 31.474,
+      "p95_ms": 32.54,
+      "requests_per_second": 31.63,
+      "audio_seconds_per_second": 949.0,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          1499,
+          4
+        ]
+      }
+    }
+  ]
+}
