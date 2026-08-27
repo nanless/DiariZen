@@ -1,0 +1,665 @@
+{
+  "engine_dir": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions",
+  "inspector_count": 24,
+  "results": [
+    {
+      "precision": "bf16",
+      "batch_size": 1,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs1_bf16.inspector.json",
+      "total_layers": 612,
+      "layer_type_counts": {
+        "kgen": 256,
+        "NoOp": 58,
+        "CaskConvolution": 20,
+        "Reformat": 7,
+        "gemm": 137,
+        "signal": 43,
+        "wait": 44,
+        "fusion": 39,
+        "PointWiseV2": 8
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 371,
+        "BFloat16": 1025
+      },
+      "qdq_bearing_layers": 0,
+      "qdq_layer_pct": 0.0,
+      "reformat_layers": 7,
+      "reformat_layer_pct": 1.144,
+      "matmul_gemm_layers": 222,
+      "low_precision_matmul_gemm_layers": 221,
+      "low_precision_matmul_gemm_hit_pct": 99.55
+    },
+    {
+      "precision": "fp32",
+      "batch_size": 1,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs1_fp32.inspector.json",
+      "total_layers": 460,
+      "layer_type_counts": {
+        "kgen": 188,
+        "NoOp": 58,
+        "CaskConvolution": 20,
+        "gemm": 184,
+        "Reformat": 2,
+        "PointWiseV2": 8
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 1337
+      },
+      "qdq_bearing_layers": 0,
+      "qdq_layer_pct": 0.0,
+      "reformat_layers": 2,
+      "reformat_layer_pct": 0.435,
+      "matmul_gemm_layers": 184,
+      "low_precision_matmul_gemm_layers": 0,
+      "low_precision_matmul_gemm_hit_pct": 0.0
+    },
+    {
+      "precision": "fp32_tf32",
+      "batch_size": 1,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs1_fp32_tf32.inspector.json",
+      "total_layers": 464,
+      "layer_type_counts": {
+        "kgen": 188,
+        "NoOp": 58,
+        "CaskConvolution": 20,
+        "Reformat": 6,
+        "gemm": 184,
+        "PointWiseV2": 8
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 1345
+      },
+      "qdq_bearing_layers": 0,
+      "qdq_layer_pct": 0.0,
+      "reformat_layers": 6,
+      "reformat_layer_pct": 1.293,
+      "matmul_gemm_layers": 184,
+      "low_precision_matmul_gemm_layers": 0,
+      "low_precision_matmul_gemm_hit_pct": 0.0
+    },
+    {
+      "precision": "fp8",
+      "batch_size": 1,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs1_fp8.inspector.json",
+      "total_layers": 718,
+      "layer_type_counts": {
+        "kgen": 274,
+        "Reformat": 32,
+        "NoOp": 49,
+        "CaskConvolution": 12,
+        "gemm": 176,
+        "signal": 83,
+        "wait": 84,
+        "CaskGemmConvolution": 8
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 136,
+        "Half": 894,
+        "FP8": 486
+      },
+      "qdq_bearing_layers": 350,
+      "qdq_layer_pct": 48.747,
+      "reformat_layers": 32,
+      "reformat_layer_pct": 4.457,
+      "matmul_gemm_layers": 281,
+      "low_precision_matmul_gemm_layers": 239,
+      "low_precision_matmul_gemm_hit_pct": 85.053
+    },
+    {
+      "precision": "int4",
+      "batch_size": 1,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs1_int4.inspector.json",
+      "total_layers": 664,
+      "layer_type_counts": {
+        "kgen": 371,
+        "NoOp": 57,
+        "CaskConvolution": 20,
+        "Reformat": 6,
+        "gemm": 192,
+        "signal": 9,
+        "wait": 9
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 1683
+      },
+      "qdq_bearing_layers": 88,
+      "qdq_layer_pct": 13.253,
+      "reformat_layers": 6,
+      "reformat_layer_pct": 0.904,
+      "matmul_gemm_layers": 280,
+      "low_precision_matmul_gemm_layers": 0,
+      "low_precision_matmul_gemm_hit_pct": 0.0
+    },
+    {
+      "precision": "int8",
+      "batch_size": 1,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs1_int8.inspector.json",
+      "total_layers": 433,
+      "layer_type_counts": {
+        "kgen": 188,
+        "Reformat": 32,
+        "NoOp": 57,
+        "CaskConvolution": 12,
+        "fusion": 66,
+        "gemm": 70,
+        "CaskGemmConvolution": 8
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 138,
+        "Half": 748,
+        "Int8": 326
+      },
+      "qdq_bearing_layers": 207,
+      "qdq_layer_pct": 47.806,
+      "reformat_layers": 32,
+      "reformat_layer_pct": 7.39,
+      "matmul_gemm_layers": 182,
+      "low_precision_matmul_gemm_layers": 159,
+      "low_precision_matmul_gemm_hit_pct": 87.363
+    },
+    {
+      "precision": "bf16",
+      "batch_size": 32,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs32_bf16.inspector.json",
+      "total_layers": 565,
+      "layer_type_counts": {
+        "kgen": 298,
+        "NoOp": 59,
+        "CaskConvolution": 20,
+        "gemm": 111,
+        "signal": 2,
+        "wait": 2,
+        "fusion": 65,
+        "PointWiseV2": 8
+      },
+      "datatype_occurrences": {
+        "Float": 332,
+        "BFloat16": 1084,
+        "Int32": 6
+      },
+      "qdq_bearing_layers": 0,
+      "qdq_layer_pct": 0.0,
+      "reformat_layers": 0,
+      "reformat_layer_pct": 0.0,
+      "matmul_gemm_layers": 265,
+      "low_precision_matmul_gemm_layers": 265,
+      "low_precision_matmul_gemm_hit_pct": 100.0
+    },
+    {
+      "precision": "fp32",
+      "batch_size": 32,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs32_fp32.inspector.json",
+      "total_layers": 467,
+      "layer_type_counts": {
+        "kgen": 192,
+        "NoOp": 57,
+        "CaskConvolution": 20,
+        "gemm": 184,
+        "signal": 2,
+        "wait": 2,
+        "Reformat": 2,
+        "PointWiseV2": 8
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 1291
+      },
+      "qdq_bearing_layers": 0,
+      "qdq_layer_pct": 0.0,
+      "reformat_layers": 2,
+      "reformat_layer_pct": 0.428,
+      "matmul_gemm_layers": 190,
+      "low_precision_matmul_gemm_layers": 0,
+      "low_precision_matmul_gemm_hit_pct": 0.0
+    },
+    {
+      "precision": "fp32_tf32",
+      "batch_size": 32,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs32_fp32_tf32.inspector.json",
+      "total_layers": 471,
+      "layer_type_counts": {
+        "kgen": 193,
+        "NoOp": 56,
+        "CaskConvolution": 20,
+        "gemm": 184,
+        "signal": 2,
+        "wait": 2,
+        "Reformat": 6,
+        "PointWiseV2": 8
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 1281
+      },
+      "qdq_bearing_layers": 0,
+      "qdq_layer_pct": 0.0,
+      "reformat_layers": 6,
+      "reformat_layer_pct": 1.274,
+      "matmul_gemm_layers": 191,
+      "low_precision_matmul_gemm_layers": 0,
+      "low_precision_matmul_gemm_hit_pct": 0.0
+    },
+    {
+      "precision": "fp8",
+      "batch_size": 32,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs32_fp8.inspector.json",
+      "total_layers": 569,
+      "layer_type_counts": {
+        "kgen": 283,
+        "Reformat": 32,
+        "NoOp": 54,
+        "CaskConvolution": 20,
+        "gemm": 176,
+        "signal": 2,
+        "wait": 2
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 144,
+        "Half": 851,
+        "FP8": 488
+      },
+      "qdq_bearing_layers": 351,
+      "qdq_layer_pct": 61.687,
+      "reformat_layers": 32,
+      "reformat_layer_pct": 5.624,
+      "matmul_gemm_layers": 286,
+      "low_precision_matmul_gemm_layers": 244,
+      "low_precision_matmul_gemm_hit_pct": 85.315
+    },
+    {
+      "precision": "int4",
+      "batch_size": 32,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs32_int4.inspector.json",
+      "total_layers": 763,
+      "layer_type_counts": {
+        "kgen": 415,
+        "NoOp": 49,
+        "CaskConvolution": 20,
+        "Reformat": 7,
+        "gemm": 232,
+        "signal": 20,
+        "wait": 20
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 1777
+      },
+      "qdq_bearing_layers": 128,
+      "qdq_layer_pct": 16.776,
+      "reformat_layers": 7,
+      "reformat_layer_pct": 0.917,
+      "matmul_gemm_layers": 361,
+      "low_precision_matmul_gemm_layers": 0,
+      "low_precision_matmul_gemm_hit_pct": 0.0
+    },
+    {
+      "precision": "int8",
+      "batch_size": 32,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs32_int8.inspector.json",
+      "total_layers": 471,
+      "layer_type_counts": {
+        "kgen": 205,
+        "Reformat": 32,
+        "NoOp": 50,
+        "CaskConvolution": 20,
+        "fusion": 66,
+        "gemm": 70,
+        "signal": 14,
+        "wait": 14
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 146,
+        "Half": 693,
+        "Int8": 328
+      },
+      "qdq_bearing_layers": 208,
+      "qdq_layer_pct": 44.161,
+      "reformat_layers": 32,
+      "reformat_layer_pct": 6.794,
+      "matmul_gemm_layers": 187,
+      "low_precision_matmul_gemm_layers": 164,
+      "low_precision_matmul_gemm_hit_pct": 87.701
+    },
+    {
+      "precision": "bf16",
+      "batch_size": 4,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs4_bf16.inspector.json",
+      "total_layers": 536,
+      "layer_type_counts": {
+        "kgen": 267,
+        "NoOp": 59,
+        "CaskConvolution": 20,
+        "Reformat": 2,
+        "gemm": 144,
+        "signal": 2,
+        "wait": 2,
+        "fusion": 32,
+        "PointWiseV2": 8
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 339,
+        "BFloat16": 1053
+      },
+      "qdq_bearing_layers": 0,
+      "qdq_layer_pct": 0.0,
+      "reformat_layers": 2,
+      "reformat_layer_pct": 0.373,
+      "matmul_gemm_layers": 232,
+      "low_precision_matmul_gemm_layers": 232,
+      "low_precision_matmul_gemm_hit_pct": 100.0
+    },
+    {
+      "precision": "fp32",
+      "batch_size": 4,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs4_fp32.inspector.json",
+      "total_layers": 471,
+      "layer_type_counts": {
+        "kgen": 193,
+        "NoOp": 58,
+        "CaskConvolution": 20,
+        "Reformat": 4,
+        "gemm": 184,
+        "signal": 2,
+        "wait": 2,
+        "PointWiseV2": 8
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 1300
+      },
+      "qdq_bearing_layers": 0,
+      "qdq_layer_pct": 0.0,
+      "reformat_layers": 4,
+      "reformat_layer_pct": 0.849,
+      "matmul_gemm_layers": 190,
+      "low_precision_matmul_gemm_layers": 0,
+      "low_precision_matmul_gemm_hit_pct": 0.0
+    },
+    {
+      "precision": "fp32_tf32",
+      "batch_size": 4,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs4_fp32_tf32.inspector.json",
+      "total_layers": 480,
+      "layer_type_counts": {
+        "kgen": 193,
+        "NoOp": 62,
+        "CaskConvolution": 20,
+        "Reformat": 9,
+        "gemm": 184,
+        "signal": 2,
+        "wait": 2,
+        "PointWiseV2": 8
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 1302
+      },
+      "qdq_bearing_layers": 0,
+      "qdq_layer_pct": 0.0,
+      "reformat_layers": 9,
+      "reformat_layer_pct": 1.875,
+      "matmul_gemm_layers": 190,
+      "low_precision_matmul_gemm_layers": 0,
+      "low_precision_matmul_gemm_hit_pct": 0.0
+    },
+    {
+      "precision": "fp8",
+      "batch_size": 4,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs4_fp8.inspector.json",
+      "total_layers": 575,
+      "layer_type_counts": {
+        "kgen": 284,
+        "NoOp": 59,
+        "Reformat": 32,
+        "CaskConvolution": 16,
+        "gemm": 176,
+        "signal": 2,
+        "wait": 2,
+        "CaskGemmConvolution": 4
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 144,
+        "Half": 863,
+        "FP8": 488
+      },
+      "qdq_bearing_layers": 351,
+      "qdq_layer_pct": 61.043,
+      "reformat_layers": 32,
+      "reformat_layer_pct": 5.565,
+      "matmul_gemm_layers": 286,
+      "low_precision_matmul_gemm_layers": 244,
+      "low_precision_matmul_gemm_hit_pct": 85.315
+    },
+    {
+      "precision": "int4",
+      "batch_size": 4,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs4_int4.inspector.json",
+      "total_layers": 751,
+      "layer_type_counts": {
+        "kgen": 415,
+        "NoOp": 53,
+        "CaskConvolution": 20,
+        "Reformat": 9,
+        "gemm": 232,
+        "signal": 11,
+        "wait": 11
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 1790
+      },
+      "qdq_bearing_layers": 128,
+      "qdq_layer_pct": 17.044,
+      "reformat_layers": 9,
+      "reformat_layer_pct": 1.198,
+      "matmul_gemm_layers": 360,
+      "low_precision_matmul_gemm_layers": 0,
+      "low_precision_matmul_gemm_hit_pct": 0.0
+    },
+    {
+      "precision": "int8",
+      "batch_size": 4,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs4_int8.inspector.json",
+      "total_layers": 452,
+      "layer_type_counts": {
+        "kgen": 206,
+        "NoOp": 58,
+        "Reformat": 32,
+        "CaskConvolution": 16,
+        "fusion": 66,
+        "gemm": 70,
+        "CaskGemmConvolution": 4
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 146,
+        "Half": 715,
+        "Int8": 328
+      },
+      "qdq_bearing_layers": 208,
+      "qdq_layer_pct": 46.018,
+      "reformat_layers": 32,
+      "reformat_layer_pct": 7.08,
+      "matmul_gemm_layers": 187,
+      "low_precision_matmul_gemm_layers": 164,
+      "low_precision_matmul_gemm_hit_pct": 87.701
+    },
+    {
+      "precision": "bf16",
+      "batch_size": 8,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs8_bf16.inspector.json",
+      "total_layers": 551,
+      "layer_type_counts": {
+        "kgen": 280,
+        "NoOp": 62,
+        "CaskConvolution": 20,
+        "Reformat": 1,
+        "gemm": 132,
+        "signal": 2,
+        "wait": 2,
+        "fusion": 44,
+        "PointWiseV2": 8
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 341,
+        "BFloat16": 1068
+      },
+      "qdq_bearing_layers": 0,
+      "qdq_layer_pct": 0.0,
+      "reformat_layers": 1,
+      "reformat_layer_pct": 0.181,
+      "matmul_gemm_layers": 247,
+      "low_precision_matmul_gemm_layers": 247,
+      "low_precision_matmul_gemm_hit_pct": 100.0
+    },
+    {
+      "precision": "fp32",
+      "batch_size": 8,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs8_fp32.inspector.json",
+      "total_layers": 468,
+      "layer_type_counts": {
+        "kgen": 193,
+        "NoOp": 57,
+        "CaskConvolution": 20,
+        "gemm": 184,
+        "signal": 2,
+        "wait": 2,
+        "Reformat": 2,
+        "PointWiseV2": 8
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 1294
+      },
+      "qdq_bearing_layers": 0,
+      "qdq_layer_pct": 0.0,
+      "reformat_layers": 2,
+      "reformat_layer_pct": 0.427,
+      "matmul_gemm_layers": 190,
+      "low_precision_matmul_gemm_layers": 0,
+      "low_precision_matmul_gemm_hit_pct": 0.0
+    },
+    {
+      "precision": "fp32_tf32",
+      "batch_size": 8,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs8_fp32_tf32.inspector.json",
+      "total_layers": 475,
+      "layer_type_counts": {
+        "kgen": 194,
+        "NoOp": 57,
+        "CaskConvolution": 20,
+        "Reformat": 8,
+        "gemm": 184,
+        "signal": 2,
+        "wait": 2,
+        "PointWiseV2": 8
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 1290
+      },
+      "qdq_bearing_layers": 0,
+      "qdq_layer_pct": 0.0,
+      "reformat_layers": 8,
+      "reformat_layer_pct": 1.684,
+      "matmul_gemm_layers": 191,
+      "low_precision_matmul_gemm_layers": 0,
+      "low_precision_matmul_gemm_hit_pct": 0.0
+    },
+    {
+      "precision": "fp8",
+      "batch_size": 8,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs8_fp8.inspector.json",
+      "total_layers": 566,
+      "layer_type_counts": {
+        "kgen": 284,
+        "Reformat": 32,
+        "NoOp": 50,
+        "CaskConvolution": 20,
+        "gemm": 176,
+        "signal": 2,
+        "wait": 2
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 144,
+        "Half": 845,
+        "FP8": 488
+      },
+      "qdq_bearing_layers": 351,
+      "qdq_layer_pct": 62.014,
+      "reformat_layers": 32,
+      "reformat_layer_pct": 5.654,
+      "matmul_gemm_layers": 286,
+      "low_precision_matmul_gemm_layers": 244,
+      "low_precision_matmul_gemm_hit_pct": 85.315
+    },
+    {
+      "precision": "int4",
+      "batch_size": 8,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs8_int4.inspector.json",
+      "total_layers": 770,
+      "layer_type_counts": {
+        "kgen": 416,
+        "NoOp": 54,
+        "CaskConvolution": 20,
+        "Reformat": 8,
+        "gemm": 232,
+        "signal": 20,
+        "wait": 20
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 1792
+      },
+      "qdq_bearing_layers": 128,
+      "qdq_layer_pct": 16.623,
+      "reformat_layers": 8,
+      "reformat_layer_pct": 1.039,
+      "matmul_gemm_layers": 361,
+      "low_precision_matmul_gemm_layers": 0,
+      "low_precision_matmul_gemm_hit_pct": 0.0
+    },
+    {
+      "precision": "int8",
+      "batch_size": 8,
+      "inspector": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs8_int8.inspector.json",
+      "total_layers": 480,
+      "layer_type_counts": {
+        "kgen": 206,
+        "Reformat": 32,
+        "NoOp": 58,
+        "CaskConvolution": 20,
+        "fusion": 66,
+        "gemm": 70,
+        "signal": 14,
+        "wait": 14
+      },
+      "datatype_occurrences": {
+        "Int32": 6,
+        "Float": 146,
+        "Half": 714,
+        "Int8": 328
+      },
+      "qdq_bearing_layers": 208,
+      "qdq_layer_pct": 43.333,
+      "reformat_layers": 32,
+      "reformat_layer_pct": 6.667,
+      "matmul_gemm_layers": 187,
+      "low_precision_matmul_gemm_layers": 164,
+      "low_precision_matmul_gemm_hit_pct": 87.701
+    }
+  ]
+}

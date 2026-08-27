@@ -1,0 +1,157 @@
+{
+  "backend": "TensorRT FP16 dynamic duration, fixed batch=1",
+  "tensorrt_version": "10.10.0.31",
+  "profile_seconds": {
+    "min": 2.0,
+    "opt": 10.0,
+    "max": 16.0
+  },
+  "build_seconds": null,
+  "engine_bytes": 161162652,
+  "results": [
+    {
+      "input_seconds": 2.0,
+      "input_samples": 32000,
+      "mean_ms": 3.449,
+      "p50_ms": 3.446,
+      "p95_ms": 3.465,
+      "requests_per_second": 289.95,
+      "audio_seconds_per_second": 579.9,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          99,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 4.0,
+      "input_samples": 64000,
+      "mean_ms": 3.97,
+      "p50_ms": 3.967,
+      "p95_ms": 3.99,
+      "requests_per_second": 251.9,
+      "audio_seconds_per_second": 1007.6,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          199,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 6.0,
+      "input_samples": 96000,
+      "mean_ms": 5.004,
+      "p50_ms": 5.004,
+      "p95_ms": 5.066,
+      "requests_per_second": 199.83,
+      "audio_seconds_per_second": 1199.0,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          299,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 8.0,
+      "input_samples": 128000,
+      "mean_ms": 6.209,
+      "p50_ms": 6.206,
+      "p95_ms": 6.245,
+      "requests_per_second": 161.06,
+      "audio_seconds_per_second": 1288.5,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          399,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 10.0,
+      "input_samples": 160000,
+      "mean_ms": 6.909,
+      "p50_ms": 6.913,
+      "p95_ms": 6.944,
+      "requests_per_second": 144.75,
+      "audio_seconds_per_second": 1447.5,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          499,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 12.0,
+      "input_samples": 192000,
+      "mean_ms": 9.711,
+      "p50_ms": 9.68,
+      "p95_ms": 9.981,
+      "requests_per_second": 102.97,
+      "audio_seconds_per_second": 1235.7,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          599,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 13.0,
+      "input_samples": 208000,
+      "mean_ms": 10.732,
+      "p50_ms": 10.695,
+      "p95_ms": 10.94,
+      "requests_per_second": 93.18,
+      "audio_seconds_per_second": 1211.4,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          649,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 14.0,
+      "input_samples": 224000,
+      "mean_ms": 11.645,
+      "p50_ms": 11.606,
+      "p95_ms": 11.924,
+      "requests_per_second": 85.87,
+      "audio_seconds_per_second": 1202.2,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          699,
+          4
+        ]
+      }
+    },
+    {
+      "input_seconds": 16.0,
+      "input_samples": 256000,
+      "mean_ms": 13.895,
+      "p50_ms": 13.832,
+      "p95_ms": 14.166,
+      "requests_per_second": 71.97,
+      "audio_seconds_per_second": 1151.5,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          799,
+          4
+        ]
+      }
+    }
+  ]
+}

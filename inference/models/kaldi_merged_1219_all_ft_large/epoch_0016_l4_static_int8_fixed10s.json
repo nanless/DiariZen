@@ -1,0 +1,121 @@
+{
+  "scope": "fixed 10-second synthetic inputs only",
+  "onnxruntime_version": "1.22.0",
+  "available_providers": [
+    "TensorrtExecutionProvider",
+    "CUDAExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "warmup": 5,
+  "repeats": 20,
+  "models": {
+    "static_int8": {
+      "speed": {
+        "path": "inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_multilabel_hard.static-int8.onnx",
+        "session_providers": [
+          "CUDAExecutionProvider",
+          "CPUExecutionProvider"
+        ],
+        "batches": {
+          "1": {
+            "wall_ms_mean": 40.09,
+            "wall_ms_p50": 39.25,
+            "wall_ms_p95": 43.41,
+            "per_item_ms": 40.092,
+            "audio_sec_per_s": 249.4,
+            "rtf": 0.00401
+          },
+          "8": {
+            "wall_ms_mean": 195.46,
+            "wall_ms_p50": 195.48,
+            "wall_ms_p95": 197.02,
+            "per_item_ms": 24.432,
+            "audio_sec_per_s": 409.3,
+            "rtf": 0.00244
+          },
+          "32": {
+            "wall_ms_mean": 994.64,
+            "wall_ms_p50": 995.08,
+            "wall_ms_p95": 996.51,
+            "per_item_ms": 31.083,
+            "audio_sec_per_s": 321.7,
+            "rtf": 0.00311
+          },
+          "50": {
+            "error": "RuntimeException: [ONNXRuntimeError] : 6 : RUNTIME_EXCEPTION : Non-zero status code returned while running LayerNormalization node. Name:'/base_model/feature_extractor/conv_layers.0/layer_norm/LayerNormalization' Status Message: /onnxruntime_src/onnxruntime/core/framework/bfc_arena.cc:376 void* onnxruntime::BFCArena::AllocateRawInternal(size_t, bool, onnxruntime::Stream*, bool, onnxruntime::WaitNotificationFn) Failed to allocate memory for requested buffer of size 3276697600\n"
+          }
+        },
+        "unique_profiled_nodes_by_provider": {
+          "CUDAExecutionProvider": 2882,
+          "CPUExecutionProvider": 394
+        }
+      },
+      "synthetic_parity_vs_fp32": {
+        "input": "10s seeded Gaussian noise, mean=0, std=0.05, clipped to [-1, 1]",
+        "seeds": [
+          1001,
+          1002,
+          1003
+        ],
+        "cell_exact_match_pct": 100.0,
+        "frame_exact_match_pct": 100.0,
+        "max_abs_diff": 0.0,
+        "total_frames": 1497
+      }
+    },
+    "static_int8_entropy_10s": {
+      "speed": {
+        "path": "inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_multilabel_hard.static-int8-entropy-10s.onnx",
+        "session_providers": [
+          "CUDAExecutionProvider",
+          "CPUExecutionProvider"
+        ],
+        "batches": {
+          "1": {
+            "wall_ms_mean": 38.54,
+            "wall_ms_p50": 37.78,
+            "wall_ms_p95": 43.97,
+            "per_item_ms": 38.544,
+            "audio_sec_per_s": 259.4,
+            "rtf": 0.00385
+          },
+          "8": {
+            "wall_ms_mean": 196.65,
+            "wall_ms_p50": 196.96,
+            "wall_ms_p95": 197.91,
+            "per_item_ms": 24.582,
+            "audio_sec_per_s": 406.8,
+            "rtf": 0.00246
+          },
+          "32": {
+            "wall_ms_mean": 997.65,
+            "wall_ms_p50": 997.92,
+            "wall_ms_p95": 999.06,
+            "per_item_ms": 31.177,
+            "audio_sec_per_s": 320.8,
+            "rtf": 0.00312
+          },
+          "50": {
+            "error": "RuntimeException: [ONNXRuntimeError] : 6 : RUNTIME_EXCEPTION : Non-zero status code returned while running LayerNormalization node. Name:'/base_model/feature_extractor/conv_layers.0/layer_norm/LayerNormalization' Status Message: /onnxruntime_src/onnxruntime/core/framework/bfc_arena.cc:376 void* onnxruntime::BFCArena::AllocateRawInternal(size_t, bool, onnxruntime::Stream*, bool, onnxruntime::WaitNotificationFn) Failed to allocate memory for requested buffer of size 3276697600\n"
+          }
+        },
+        "unique_profiled_nodes_by_provider": {
+          "CUDAExecutionProvider": 2882,
+          "CPUExecutionProvider": 394
+        }
+      },
+      "synthetic_parity_vs_fp32": {
+        "input": "10s seeded Gaussian noise, mean=0, std=0.05, clipped to [-1, 1]",
+        "seeds": [
+          1001,
+          1002,
+          1003
+        ],
+        "cell_exact_match_pct": 100.0,
+        "frame_exact_match_pct": 100.0,
+        "max_abs_diff": 0.0,
+        "total_frames": 1497
+      }
+    }
+  }
+}

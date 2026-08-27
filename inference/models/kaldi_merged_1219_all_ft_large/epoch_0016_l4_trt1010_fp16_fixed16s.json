@@ -1,0 +1,194 @@
+{
+  "backend": "TensorRT fp16",
+  "tensorrt_version": "10.10.0.31",
+  "input_seconds": 16.0,
+  "input_samples": 256000,
+  "results": [
+    {
+      "batch_size": 1,
+      "input_seconds": 16.0,
+      "input_samples": 256000,
+      "warmup": 10,
+      "repeats": 50,
+      "mean_ms": 10.741,
+      "p50_ms": 10.754,
+      "p95_ms": 10.823,
+      "per_item_ms": 10.741,
+      "audio_seconds_per_second": 1489.6,
+      "output_shapes": {
+        "multilabel": [
+          1,
+          799,
+          4
+        ]
+      },
+      "engine_bytes": 171371492,
+      "inspector_layer_counts": {
+        "fp8": 0,
+        "int8": 0,
+        "int4": 0,
+        "bf16": 0,
+        "half": 397,
+        "float": 124
+      },
+      "inspector_path": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s/segmentation_16s_bs1_fp16.inspector.json",
+      "build_seconds": 173.39,
+      "reused_existing_engine": false
+    },
+    {
+      "batch_size": 2,
+      "input_seconds": 16.0,
+      "input_samples": 256000,
+      "warmup": 10,
+      "repeats": 50,
+      "mean_ms": 25.572,
+      "p50_ms": 25.558,
+      "p95_ms": 26.476,
+      "per_item_ms": 12.786,
+      "audio_seconds_per_second": 1251.3,
+      "output_shapes": {
+        "multilabel": [
+          2,
+          799,
+          4
+        ]
+      },
+      "engine_bytes": 179958412,
+      "inspector_layer_counts": {
+        "fp8": 0,
+        "int8": 0,
+        "int4": 0,
+        "bf16": 0,
+        "half": 416,
+        "float": 129
+      },
+      "inspector_path": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s/segmentation_16s_bs2_fp16.inspector.json",
+      "build_seconds": 172.078,
+      "reused_existing_engine": false
+    },
+    {
+      "batch_size": 4,
+      "input_seconds": 16.0,
+      "input_samples": 256000,
+      "warmup": 10,
+      "repeats": 50,
+      "mean_ms": 54.98,
+      "p50_ms": 54.893,
+      "p95_ms": 56.457,
+      "per_item_ms": 13.745,
+      "audio_seconds_per_second": 1164.1,
+      "output_shapes": {
+        "multilabel": [
+          4,
+          799,
+          4
+        ]
+      },
+      "engine_bytes": 206481500,
+      "inspector_layer_counts": {
+        "fp8": 0,
+        "int8": 0,
+        "int4": 0,
+        "bf16": 0,
+        "half": 452,
+        "float": 128
+      },
+      "inspector_path": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s/segmentation_16s_bs4_fp16.inspector.json",
+      "build_seconds": 187.579,
+      "reused_existing_engine": false
+    },
+    {
+      "batch_size": 8,
+      "input_seconds": 16.0,
+      "input_samples": 256000,
+      "warmup": 10,
+      "repeats": 50,
+      "mean_ms": 119.112,
+      "p50_ms": 119.055,
+      "p95_ms": 121.107,
+      "per_item_ms": 14.889,
+      "audio_seconds_per_second": 1074.6,
+      "output_shapes": {
+        "multilabel": [
+          8,
+          799,
+          4
+        ]
+      },
+      "engine_bytes": 250405700,
+      "inspector_layer_counts": {
+        "fp8": 0,
+        "int8": 0,
+        "int4": 0,
+        "bf16": 0,
+        "half": 468,
+        "float": 126
+      },
+      "inspector_path": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s/segmentation_16s_bs8_fp16.inspector.json",
+      "build_seconds": 219.854,
+      "reused_existing_engine": false
+    },
+    {
+      "batch_size": 16,
+      "input_seconds": 16.0,
+      "input_samples": 256000,
+      "warmup": 10,
+      "repeats": 50,
+      "mean_ms": 256.401,
+      "p50_ms": 256.587,
+      "p95_ms": 259.514,
+      "per_item_ms": 16.025,
+      "audio_seconds_per_second": 998.4,
+      "output_shapes": {
+        "multilabel": [
+          16,
+          799,
+          4
+        ]
+      },
+      "engine_bytes": 342242556,
+      "inspector_layer_counts": {
+        "fp8": 0,
+        "int8": 0,
+        "int4": 0,
+        "bf16": 0,
+        "half": 480,
+        "float": 130
+      },
+      "inspector_path": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s/segmentation_16s_bs16_fp16.inspector.json",
+      "build_seconds": 280.328,
+      "reused_existing_engine": false
+    },
+    {
+      "batch_size": 32,
+      "input_seconds": 16.0,
+      "input_samples": 256000,
+      "warmup": 10,
+      "repeats": 50,
+      "mean_ms": 544.677,
+      "p50_ms": 544.498,
+      "p95_ms": 547.546,
+      "per_item_ms": 17.021,
+      "audio_seconds_per_second": 940.0,
+      "output_shapes": {
+        "multilabel": [
+          32,
+          799,
+          4
+        ]
+      },
+      "engine_bytes": 526268068,
+      "inspector_layer_counts": {
+        "fp8": 0,
+        "int8": 0,
+        "int4": 0,
+        "bf16": 0,
+        "half": 536,
+        "float": 95
+      },
+      "inspector_path": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s/segmentation_16s_bs32_fp16.inspector.json",
+      "build_seconds": 414.097,
+      "reused_existing_engine": false
+    }
+  ]
+}

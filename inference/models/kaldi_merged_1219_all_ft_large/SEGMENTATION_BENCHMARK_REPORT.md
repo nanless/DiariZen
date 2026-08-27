@@ -2,8 +2,8 @@
 
 > **实验名称**：`kaldi_merged_1219_all_ft_large` / checkpoint `epoch_0016`  
 > **测试范围**：**仅 segmentation 模型**（不含 speaker embedding、VBx 聚类、滑窗重叠、RTTM 后处理）  
-> **测试日期**：2026-08-26  
-> **测试 GPU**：NVIDIA A800-SXM4-80GB（双卡，benchmark 使用空闲的 **GPU 0**）  
+> **测试日期**：2026-08-26～2026-08-27<br>
+> **测试 GPU**：NVIDIA A800-SXM4-80GB（原始测试）与 NVIDIA L4 24GB（固定 10s、最大 16s 与并发 50 复测）<br>
 > **对应线上模型**：与 `speaker_diarize_infer` 中 `epoch_0016_multilabel_hard.onnx` 为同一文件（MD5: `0a2142c0874e553206633e65b8348dd1`）
 
 ---
@@ -40,10 +40,10 @@
 
 | 假设 | 说明 |
 |------|------|
-| 输入 | 16 kHz 单通道，固定 **10 秒** → `[B, 1, 160000]` |
+| 输入 | 原始基准为固定 10 秒；线上容量补测覆盖 16 kHz 单通道、最长 **16 秒** → `[B, 1, 256000]` |
 | 输出 | 帧级 multilabel `{0,1}`，shape `[B, frames, 4]`（最多 4 说话人） |
 | 不包含 | embedding 提取、聚类、长音频滑窗、VAD、后处理 |
-| 并发语义 | 「50 路并发」= 50 条 10s 音频同时到达，拼成 **microbatch 一次 forward** |
+| 并发语义 | 原始 A800 测试为 50 条 10s 拼 microbatch；L4 线上补测为 50 条 16s 同时到达并进入 batch=1 context/stream 队列 |
 
 ### 1.3 评估指标
 
@@ -60,15 +60,23 @@
 
 | 维度 | 结论 |
 |------|------|
-| **推荐部署** | **ONNX Runtime + CUDAExecutionProvider（FP32）** |
+| **推荐部署** | L4 固定 10s 性能首选 **TensorRT 10.10 FP16**；ORT CUDA FP32 保留为已验证生产基线 |
 | **50 条 10s 墙钟** | **233 ms**（均摊 4.7 ms/条），约为 PyTorch FP16 的 **1.5×** 加速 |
 | **精度** | ORT vs PyTorch FP32：帧一致 **99.998%**，cross DER **0.004%**（几乎无损） |
 | **PyTorch FP16** | 大 batch 有加速，但不如 ORT；cross DER +0.26%（可接受） |
 | **dynamic INT8** | 精度尚可（DER +4.3%），但 GPU **慢 12×**，不可用 |
 | **static INT8** | 精度崩溃（DER 53.7%），GPU 慢 1.4×，不可用 |
-| **TensorRT FP8** | 本机 TRT 无法初始化；A800 无 FP8 TC → 需 **L4** 复测 |
+| **A800 TensorRT / FP8** | 本机 TRT 无法初始化；A800 无 FP8 TC，因此未测 |
+| **L4 ORT FP32** | 10s×1/8/32/50：**20.5 / 163.0 / 748.7 / 1184.2 ms**；bs=50 约比 A800 慢 5.1× |
+| **L4 INT8** | dynamic/static 均慢于 ORT FP32；三种 INT8 在 bs=50 均 OOM |
+| **L4 TensorRT FP16** | 10.10.0.31 已解决旧版崩溃；bs=1/4/8/32 比 ORT FP32 快 **2.96–3.26×** |
+| **L4 TensorRT 多精度** | 已完成严格 FP32、TF32、FP16、BF16、FP8、INT8、INT4 weight-only；四档 batch 中均为 **FP16 最快** |
+| **TensorRT PTQ 精度** | FP8 frame exact 约 **98.99–99.40%**；INT8 仅约 **0.20–0.60%** 且运行时非确定，不可用；INT4 weight-only 为 **96.79%** 且无加速 |
+| **L4 线上 16s** | FP16 batch=1 **10.741ms**；50 条突发用 2 contexts 时总完成 **534.8ms**、请求完成 p95 **514.3ms**、约 **93.5 req/s** |
+| **线上 batch 策略** | **禁用动态合批**；16s 的 bs=2/4/8/16/32 每条成本均高于 bs=1，bs=32 吞吐仅为 bs=1 的 63.1% |
+| **可变时长** | 动态 duration plan 覆盖 2–16s；结合固定 10s/16s plan 做长度路由，短音频不必全部补到 16s |
 
-**一句话**：当前最高性价比方案是 **ORT CUDA FP32**，不要在本模型上做 INT8 PTQ。
+**一句话**：线上最长 16s、并发上限 50 时，使用 **1 张 L4 + TensorRT FP16 + batch=1 + 2 个 execution contexts + 按时长路由**；不要动态合批，ORT CUDA FP32 仅作为独立进程回退。
 
 ---
 
@@ -205,9 +213,143 @@ Powerset 分类头 → argmax 硬解码 → multilabel [B, frames, 4]
 | static INT8 QDQ | 330 ms | 1.4× 慢 | 16 Memcpy 节点 |
 | dynamic INT8 | **2901 ms** | **12× 慢** | 456 Memcpy 节点，GPU 极不友好 |
 
-### 5.6 L4 粗估（未实测，仅供参考）
+### 5.6 L4 固定 10 秒实测（2026-08-26）
 
-L4 显存带宽约为 A800 的 1/5~1/6。10s×50 ORT FP32 粗估 **1.0–1.5 s**（带宽敏感型负载）。
+本节只使用固定 `[B, 1, 160000]` 的 10 秒 synthetic 输入；速度输入为全零 tensor。未运行真实音频、长音频或 DER/JER。每档 warmup 5 次、正式计时 20 次。
+
+#### 5.6.1 环境
+
+| 项目 | L4 配置 |
+|------|---------|
+| GPU | NVIDIA L4 24GB，compute capability 8.9 |
+| Driver / CUDA | 535.129.03 / CUDA 12.4 |
+| PyTorch | 2.1.1，CUDA 12.1（conda `diarizen`） |
+| ONNX Runtime | 1.22.0，CUDA EP + CPU EP |
+| TensorRT | 10.10.0.31（Conda env `diarizen-trt1010`，路径 `/root/miniforge3/envs/diarizen-trt1010`） |
+
+#### 5.6.2 FP32 / FP16 基线
+
+| Backend | bs=1 | bs=8 | bs=32 | bs=50 | p95（bs=50） | audio-sec/s（bs=50） |
+|---------|------|------|-------|-------|---------------|----------------------|
+| **ORT CUDA FP32** | **20.49 ms** | **162.99 ms** | **748.72 ms** | **1184.15 ms** | 1185.72 ms | 422.2 |
+| PyTorch FP16 | 27.53 ms | 164.55 ms | 749.01 ms | 1184.71 ms | 1186.68 ms | 422.0 |
+| PyTorch FP32 | 30.02 ms | 250.37 ms | 1063.89 ms | 1696.65 ms | 1701.84 ms | 294.7 |
+
+结论：ORT CUDA 只在 bs=1 明显领先 PyTorch FP16（约 1.34×）；bs=8/32/50 二者几乎相同。ORT bs=50 的 1184 ms 与 A800 的 233 ms 相比慢约 **5.1×**，此前 1.0–1.5s 的粗估被实测验证。
+
+#### 5.6.3 INT8 速度与容量边界
+
+| 模型 | bs=1 | bs=8 | bs=32 | bs=50 | 相对 ORT FP32 | ORT 节点分配（CUDA / CPU） |
+|------|------|------|-------|-------|----------------|-----------------------------|
+| dynamic INT8 | 106.93 ms | 543.63 ms | 2298.06 ms | **OOM** | 慢 3.1–5.2× | 2170 / 678 |
+| static INT8 MinMax | 40.09 ms | 195.46 ms | 994.64 ms | **OOM** | 慢 1.2–2.0× | 2882 / 394 |
+| static INT8 Entropy+10s | 38.54 ms | 196.65 ms | 997.65 ms | **OOM** | 慢 1.2–1.9× | 2882 / 394 |
+
+- dynamic INT8 触发 ORT 警告：插入 **456 个 Memcpy**；static INT8 为 16 个。CPU fallback 与设备搬运抵消了量化收益。
+- 三种 INT8 在 bs=50 均于首层 LayerNorm 申请 `3,276,697,600` 字节 buffer 时失败；L4 上 INT8 的可用上限为 bs=32。
+- 用 seeds 1001/1002/1003 的 3 条 10 秒高斯噪声（均值 0、标准差 0.05）检查，三种 INT8 相对 FP32 ONNX 均为 cell/frame **100% exact match**（1497 帧）。这只是 synthetic 功能一致性检查，不能替代真实音频 DER。
+
+#### 5.6.4 TensorRT FP16：问题修复与实测
+
+旧环境 TensorRT 10.0.1 能解析 ONNX、能构建 FP32，却在 FP16 `build_serialized_network` 内稳定段错误。解决方案是在不修改 `diarizen/cosyvoice` 的前提下创建独立环境，并升级到 TensorRT **10.10.0.31**。环境最初为 Python venv，已于 2026-08-27 迁移为可由 `conda env list` 管理的同名 Conda env；Python/PyTorch/CUDA/TensorRT 版本保持不变，并已重新验证 FP16 engine 反序列化及 10 秒 synthetic 推理。新版成功将图解析/优化为 6192 层并生成全部 FP16 engines。
+
+TensorRT 检测到 LayerNorm FP16 溢出风险，自动建议/选择让相关 Reduce/Pow 使用更高精度；因此这里的“FP16”是 TensorRT mixed-precision FP16，而不是不安全的全算子强制 FP16。
+
+| Batch | TensorRT mean | p50 | p95 | ORT FP32 mean | 加速比 | audio-sec/s | Engine | Build |
+|-------|---------------|-----|-----|---------------|--------|-------------|--------|-------|
+| 1 | **6.283 ms** | 6.418 ms | 6.434 ms | 20.49 ms | **3.26×** | 1591.5 | 163.6 MB | 175.5s |
+| 4 | **25.662 ms** | 25.704 ms | 26.000 ms | 75.97 ms | **2.96×** | 1558.8 | 184.4 MB | 219.3s |
+| 8 | **53.450 ms** | 53.200 ms | 55.965 ms | 162.99 ms | **3.05×** | 1496.7 | 210.4 MB | 241.9s |
+| 32 | **240.275 ms** | 239.981 ms | 241.748 ms | 748.72 ms | **3.12×** | 1331.8 | 385.4 MB | 366.9s |
+
+#### 5.6.5 TensorRT 各精度横向实测
+
+使用 NVIDIA ModelOpt 0.46.0 生成显式 Q/DQ 图；FP8/INT8 量化 MatMul/Gemm，未量化层保留 FP16/FP32。INT4 使用 block=128 的 weight-only DQ；为满足 TensorRT 的整除约束，排除 56 个输入维度不能被 128 整除的权重，保留 128 个 INT4 权重节点。
+
+| TensorRT 路径 | bs=1 | bs=4 | bs=8 | bs=32 | 引擎检查证据（bs=1/4） | 结论 |
+|---------------|------|------|------|-------|--------------------------|------|
+| **FP16 mixed** | **6.283 ms** | **25.662 ms** | **53.450 ms** | **240.275 ms** | FP16 builder + 高精度 LayerNorm fallback | **四档最快** |
+| INT8 explicit Q/DQ | 6.502 ms | 28.726 ms | 60.439 ms | 270.433 ms | 206 / 207 个 INT8 标记 | 速度第二，但 synthetic 精度崩溃 |
+| FP8 explicit Q/DQ | 6.982 ms | 31.444 ms | 66.072 ms | 302.986 ms | 330 / 331 个 FP8 标记 | 真正命中 FP8，但慢于 FP16 |
+| BF16 mixed | 9.755 ms | 37.925 ms | 78.789 ms | 352.353 ms | 175 / 176 个 BF16 标记 | 可用但无性能优势 |
+| FP32 + TF32 | 13.361 ms | 55.502 ms | 116.962 ms | 526.436 ms | 462 / 474 个 Float 标记 | 比严格 FP32 降低约 15–23% 延迟 |
+| INT4 weight-only | 13.702 ms | 55.930 ms | 120.233 ms | 534.227 ms | 128 个 INT4 DQ 权重；0 个 INT4 计算标记 | 实际 Float 计算，不加速 |
+| 严格 FP32 | 17.249 ms | 68.271 ms | 147.735 ms | 616.571 ms | TF32 已关闭 | 精度控制组 |
+| FP4 / NVFP4 | — | — | — | — | L4 为 Ada SM8.9，无 FP4 Tensor Core | **硬件不支持，不做伪回退测速** |
+
+FP8 首次构建时报非 INT8 Q/DQ 类型推导失败；将网络创建方式改为 `STRONGLY_TYPED`，并去掉与强类型网络冲突的 builder precision flag 后成功。检查器确认 FP8/INT8 引擎实际含对应低精度层，因此这些数字不是仅改文件名或自动回退得到的结果。
+
+Engine inspector 的进一步分析解释了低精度没有超过 FP16 的原因：FP8 的 Q/DQ-bearing layers 占 **48.7–62.0%**、Reformat 占 **4.46–5.65%**，低精度 MatMul/Gemm 命中率约 **85.1–85.3%**；INT8 的对应值为 **43.3–47.8%**、**6.67–7.39%**、**87.4–87.7%**。INT4 的低精度 MatMul/Gemm 命中率为 **0%**。量化转换与仍需 FP16/FP32 执行的算子抵消了低精度 GEMM 收益。
+
+#### 5.6.6 非静音 synthetic 输出一致性
+
+普通 sine/noise synthetic 被模型全部判为静音，不足以验证精度。为避免使用真实音频，使用 PyTorch 梯度生成了一条固定 10 秒 adversarial synthetic waveform：ORT FP32 每条输出中有 480 个正类 cell，再复制到各 batch 对比 TensorRT hard multilabel。
+
+| TensorRT 路径 | bs=1 frame exact | bs=4 | bs=8 | bs=32 | 判断 |
+|---------------|------------------|------|------|-------|------|
+| 严格 FP32 | 100.0000% | 99.7495% | 99.8246% | 99.5741% | batch/tactic 边界有少量 hard-decision 差异 |
+| FP32 + TF32 | 100.0000% | 99.7495% | 99.7996% | 99.5741% | 与严格 FP32 接近 |
+| FP16 mixed | 100.0000% | 99.7495% | 99.7996% | 99.5554% | 当前速度/一致性最佳折中 |
+| BF16 mixed | 100.0000% | 99.7495% | 99.8246% | 99.0105% | bs=32 差异略增 |
+| FP8 explicit Q/DQ | 99.3988% | 99.2986% | 99.3487% | 98.9917% | 可运行，但不快于 FP16 |
+| INT8 explicit Q/DQ | 0.2004% | 0.5010% | 0.4008% | 0.3945% | **PTQ 校准失真且非确定，不可用** |
+| INT4 weight-only | 96.7936% | 96.7936% | 96.7936% | 96.7936% | 精度更差且更慢 |
+
+INT8 的正类总数与参考接近，但位置几乎全部错位（cell exact 仅约 52.6%），排除了“只是全零/全一输出”的假象。表中 INT8 是一次 warmup 后的代表性回归；独立进程复测 frame exact 仍在约 0.20–0.60% 间波动。全 28 engine 在迁移后的 Conda env 中连续执行两次：除 INT8 外均为 **100% repeat exact**；INT8 仅为 **99.80–99.90% cell repeat exact**，说明同一 context、同一输入仍存在 hard-decision 波动。以上是比全静音输入更严格的 synthetic 功能检查，但按本轮约束没有真实音频，不能换算为 DER/JER，也不能替代上线验收。
+
+### 5.7 L4 线上最大 16 秒、并发 50（2026-08-27）
+
+本节仍只使用 synthetic tensor，不使用真实音频。固定 16 秒测试 warmup 10 次、计时 50 次；动态时长最终复测计时 100 次；50 请求突发测试每档 30 次。
+
+#### 5.7.1 固定 16 秒 FP16：大 batch 反而降低吞吐
+
+| Batch | mean | p95 | 每条 mean | req/s | audio-sec/s |
+|-------|------|-----|-----------|-------|-------------|
+| **1** | **10.741 ms** | **10.823 ms** | **10.741 ms** | **93.10** | **1489.6** |
+| 2 | 25.572 ms | 26.476 ms | 12.786 ms | 78.21 | 1251.3 |
+| 4 | 54.980 ms | 56.457 ms | 13.745 ms | 72.75 | 1164.1 |
+| 8 | 119.112 ms | 121.107 ms | 14.889 ms | 67.16 | 1074.6 |
+| 16 | 256.401 ms | 259.514 ms | 16.025 ms | 62.40 | 998.4 |
+| 32 | 544.677 ms | 547.546 ms | 17.021 ms | 58.75 | 940.0 |
+
+L4 为 Ada 架构；该模型在 batch=1 时已能很好利用 GPU/L2 cache。batch=32 的每条 GPU 时间比 batch=1 高 **58.5%**，吞吐只剩 **63.1%**。50 条请求若拆成 32+16+2，纯 GPU 时间约 **826.7ms**；batch=1 顺序执行的理论值约 **537.1ms**，因此线上禁用动态合批。
+
+#### 5.7.2 50 个 16 秒请求同时到达：跨 inference streams
+
+所有请求均调用固定 16s、batch=1 engine；每个 stream 使用独立 TensorRT execution context。
+
+| Contexts / streams | 50 条总完成 mean | 总完成 p95 | 请求完成 p50 mean | 请求完成 p95 mean | 吞吐 |
+|--------------------|------------------|------------|-------------------|-------------------|------|
+| 1 | 546.610 ms | 548.810 ms | 278.639 ms | 519.827 ms | 91.47 req/s |
+| **2** | **534.770 ms** | **537.643 ms** | **278.626 ms** | **514.271 ms** | **93.50 req/s** |
+| 4 | 555.050 ms | 557.857 ms | 310.746 ms | 535.477 ms | 90.08 req/s |
+| 8 | 571.648 ms | 574.098 ms | 330.803 ms | 554.939 ms | 87.47 req/s |
+
+2 contexts 是最佳点；4/8 contexts 因共享 SM/L2/DRAM 产生争用。短复测测得 1/2 contexts 常驻设备内存约 **601/813 MiB**。按最坏 16s 请求计算，单卡理论上限约 93.5 req/s；生产按 80% 水位控制在约 **74.8 req/s**，超过时背压或扩到第 2 张 L4。
+
+“并发 50”不等于“50 RPS”：前者是同时在途请求数，后者才决定队列是否持续增长。若 50 条最坏请求在同一时刻突发，单卡请求完成 p95 约 514ms；若要求该突发 p95 明显低于 500ms，需要增加 GPU 副本，而不是增大 batch。
+
+#### 5.7.3 动态时长 batch=1
+
+一个 FP16 plan 使用 `[1,1,32000] / [1,1,160000] / [1,1,256000]` 作为 min/opt/max profile，对应 2/10/16 秒。plan 为 153.7 MiB，构建 195.0s。
+
+| 时长 | mean | p95 | req/s | 推荐路径 |
+|------|------|-----|-------|----------|
+| 2s | 3.449 ms | 3.465 ms | 289.95 | 动态时长 |
+| 4s | 3.970 ms | 3.990 ms | 251.90 | 动态时长 |
+| 6s | 5.004 ms | 5.066 ms | 199.83 | 动态时长 |
+| 8s | 6.209 ms | 6.245 ms | 161.06 | 动态时长（与固定 10s 基本持平） |
+| 10s | 6.909 ms | 6.944 ms | 144.75 | 固定 10s（6.283ms） |
+| 12s | 9.711 ms | 9.981 ms | 102.97 | 动态时长 |
+| 13s | 10.732 ms | 10.940 ms | 93.18 | 固定 16s（mean 接近，p95 更低） |
+| 14s | 11.645 ms | 11.924 ms | 85.87 | 固定 16s |
+| 16s | 13.895 ms | 14.166 ms | 71.97 | 固定 16s |
+
+最低 GPU 时间的路由为：`<2s` 补到 2s；`2–8s` 动态 plan；`>8–10s` 固定 10s；`>10–12s` 动态 plan；`>12–16s` 固定 16s。若更重视运维简单而非短音频成本，可只保留固定 10s/16s 两档，但 2s 请求会从约 3.45ms 增至约 6.28ms。
+
+#### 5.7.4 16 秒 synthetic parity
+
+固定 16s 的 bs=1/2/4/8/16/32 均成功输出 `[B,799,4]`，相对 ORT CPU FP32 reference 的 cell/frame exact 均为 **100%**。普通 harmonic pseudo-speech 在该 hard multilabel 模型上全为零，因此这里只证明 16 秒图执行、输出 shape 和静音边界一致；非零类别仍由 10 秒 adversarial synthetic parity 覆盖。本轮按约束没有运行真实音频或 DER/JER。
 
 ---
 
@@ -306,19 +448,25 @@ TensorRT FP16 基线
 
 | 方案 | 状态 | 原因 |
 |------|------|------|
-| TensorRT FP16 | ❌ 未跑 | TRT CUDA init error 35 |
-| Selective FP8 | ❌ 未跑 | 需 L4/H100 FP8 TC + TRT builder |
-| SmoothQuant INT8 | ❌ 未跑 | 需 TRT explicit Q/DQ |
+| TensorRT FP16 | ✅ L4 完成 | 升级至 TRT 10.10.0.31 后，bs=1/4/8/32 engine 全部构建并测速 |
+| ModelOpt FP8 explicit Q/DQ | ✅ L4 完成 | 强类型 engine 成功；330–331 个 FP8 层标记，但四档均慢于 FP16 |
+| ModelOpt INT8 explicit Q/DQ | ⚠️ L4 完成但不可用 | 206–207 个 INT8 层，速度第二；frame exact 仅约 0.20–0.60%，repeat exact 也非 100% |
+| ModelOpt INT4 weight-only | ⚠️ L4 完成但不推荐 | 128 个 DQ 权重，计算检查器无 INT4 层；比 FP16 慢 2.18–2.25× |
+| FP4 / NVFP4 | ⛔ L4 不支持 | FP4 Tensor Core 需要 Blackwell；L4 是 Ada SM8.9 |
+| SmoothQuant INT8 alpha 扫描 | ⛔ 当前工具链不支持 | 已检查 ModelOpt 0.46 ONNX 包，无 SmoothQuant 实现；需另写图变换/引入新工具链，且当前 INT8 已不满足确定性 |
 | PyTorch FP16 基线 | ✅ | 已完成 |
-| ORT CUDA FP32 | ✅ | 当前最优 |
+| ORT CUDA FP32 | ✅ | 精度基线与生产回退 |
 
-### 8.2 待 L4 环境执行的测试清单
+### 8.2 L4 测试清单完成情况
 
-1. 为 bs=1/4/8/32 各建独立 TRT engine（固定 `[B,1,160000]`）
-2. WavLM 大型对齐 Linear → FP8；LayerNorm 保持 FP16/FP32 统计
-3. SmoothQuant alpha 扫描：0.4 / 0.5 / 0.6 / 0.7
-4. Profile：Q/DQ 融合率、Reformat 占比、FP8 GEMM 命中率
-5. 精度验收线：DER 增幅 ≤ 0.2%，p95 延迟改善 ≥ 10%
+1. ~~在 L4 验证 TensorRT builder 与固定 10s 图~~：已完成；TRT 10.10 已跑完 FP32/TF32/FP16/BF16/FP8/INT8/INT4 的 bs=1/4/8/32。
+2. ~~运行 ORT FP32 / PyTorch FP32 / PyTorch FP16 固定 10s 基线~~：已完成，batch=1/8/32/50。
+3. ~~运行已有 dynamic/static INT8 固定 10s 模型~~：已完成，batch=1/8/32；batch=50 OOM。
+4. ~~生成并运行 FP8/INT8 explicit Q/DQ 图~~：已完成；engine inspector 已确认低精度层命中。
+5. ~~生成并运行 INT4 weight-only 图~~：已完成；L4 上无 INT4 计算层和速度收益。
+6. 按本轮约束，不运行真实音频与 DER/JER；只报告 synthetic 输出一致性。
+7. ~~分析 Q/DQ、Reformat 和低精度 GEMM 命中率~~：已通过 24 个 detailed inspector JSON 完成。
+8. ~~迁移并回归 Conda 环境~~：已完成；28 个 engine 全部在 `diarizen-trt1010` 中成功执行。
 
 ---
 
@@ -328,32 +476,86 @@ TensorRT FP16 基线
 |------|------|----------|
 | ORT CUDA EP 长音频 `rel_attn Gather` 报错 | 部分 >60s 音频无法用 CUDA EP | 精度评估改用 CPU EP；或拆分短窗 |
 | PyTorch GPU 长音频 OOM | 284s 音频 attention 显存爆炸 | 精度参考用 CPU FP32 |
-| TensorRT 不可用 | 无法验证 FP16/FP8 编译收益 | 在 L4 机器复测 |
-| A800 无 FP8 TC | FP8 benchmark 无意义 | 换 L4 |
-| INT8 PTQ 失败 | 无法通过量化压缩延迟 | 保持 FP32 ORT |
+| L4 TensorRT 10.0.1 FP16 builder 段错误 | 旧环境无法生成 FP16 engine | **已解决**：独立 Conda env `diarizen-trt1010` 使用 10.10.0.31；原 venv 备份保留 |
+| FP8 普通网络类型推导失败 | 非 INT8 Q/DQ 无法构建 | **已解决**：量化 engine 使用 `STRONGLY_TYPED`，由 Q/DQ/ONNX 类型决定精度 |
+| L4 INT8 bs=50 OOM | INT8 最大实测 batch 为 32 | L4 上限制 batch≤32；不要因模型体积变小假设运行显存也更小 |
+| TensorRT INT8 PTQ synthetic 精度崩溃 | 虽有速度但不可部署 | 保持 TensorRT FP16；如继续 INT8，需 SmoothQuant/QAT 并重新验收 |
+| INT4 block 不整除 | 原始 INT4 图无法被 TensorRT 解析 | 排除 56 个非 128 整除权重后可构建，但 L4 无 INT4 计算收益 |
+| L4 不支持 FP4 | 无法进行原生 FP4 benchmark | 仅在 Blackwell GPU 上测试 NVFP4 |
 
 ---
 
 ## 10. 推荐生产配置
 
 ```yaml
-# 分割模型 serving 推荐配置（基于 2026-08-26 实测）
-backend: onnxruntime
-provider: CUDAExecutionProvider  # 失败时 fallback CPUExecutionProvider
+# 分割模型 serving 推荐配置（基于 2026-08-27 L4 实测）
+backend: tensorrt
+tensorrt_version: 10.10.0.31
+conda_env: /root/miniforge3/envs/diarizen-trt1010
+precision: fp16_mixed
 model: epoch_0016_multilabel_hard.onnx
 input_dtype: float32
-input_shape: [B, 1, 160000]      # 10s 固定；可变长需另行处理
-batch_strategy:
-  audio_10s: bs=50               # 50 路并发一次 forward
-  audio_30s: bs=32               # bs=50 OOM
-  audio_60s: bs=16               # 按显存调整
-expected_latency_10s_x50: ~233ms # A800 参考值
-precision_vs_fp32: negligible    # DER +0.004%
+sample_rate: 16000
+max_audio_seconds: 16
+
+engines:
+  dynamic_2s_16s: trt_l4_trt1010_dynamic/segmentation_bs1_2s-16s_opt10s_fp16.plan
+  fixed_10s: trt_l4_trt1010/segmentation_10s_bs1_fp16.plan
+  fixed_16s: trt_l4_trt1010_16s/segmentation_16s_bs1_fp16.plan
+
+duration_router:
+  - "duration < 2s: pad to 2s -> dynamic_2s_16s"
+  - "2s <= duration <= 8s: ceil to 1s bucket -> dynamic_2s_16s"
+  - "8s < duration <= 10s: pad to 10s -> fixed_10s"
+  - "10s < duration <= 12s: ceil to 1s bucket -> dynamic_2s_16s"
+  - "12s < duration <= 16s: pad to 16s -> fixed_16s"
+
+scheduler:
+  batch_size: 1
+  dynamic_batching: false
+  execution_contexts_per_active_engine: 2
+  max_inflight_requests: 50
+  queue_capacity: 100
+  overload: reject_429_or_route_to_second_l4
+
+transport:
+  protocol: grpc
+  payload: pcm_s16le_binary
+  preprocess_client_side: mono_16khz
+  avoid: json_base64_audio
+
+warmup:
+  on_startup: true
+  shapes_seconds: [2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 16]
+
+fallback:
+  backend: onnxruntime
+  provider: CUDAExecutionProvider
+  deployment: separate_process_in_conda_env_diarizen
+
+capacity_guardrail_worst_case_16s:
+  measured_requests_per_second: 93.5
+  target_utilization: 0.8
+  admission_requests_per_second: 74.8
+  burst_50_request_completion_p95_ms_gpu_only: 514.3
+
 avoid:
+  - tensorrt_dynamic_batching
+  - fixed_batch_greater_than_1
+  - four_or_more_execution_contexts
   - dynamic_int8_on_gpu
   - static_int8
+  - tensorrt_int8_ptq_current_calibration
+  - int4_weight_only_on_l4
+  - fp4_on_l4
   - pytorch_eager_production
 ```
+
+服务层应预分配 pinned host buffer、CUDA input/output buffer，并用两个独立 context/stream 异步 H2D→enqueue→D2H。动态输入向上取整到 1 秒 bucket，避免每个任意 sample 数触发 shape 切换。请求传二进制 PCM16，不传 JSON/base64；解码和重采样尽量放上游。服务启动时加载 plan 并 warmup 所有路由 bucket，健康检查至少验证 2s/10s/16s shape。记录 `decode_ms`、`queue_ms`、`h2d_ms`、`gpu_ms`、`postprocess_ms`、端到端 p50/p95/p99、队列深度、拒绝数和 GPU 显存。
+
+`diarizen-trt1010` 中的 ORT 1.18 CUDA provider 会因缺少 `libcudnn.so.8` 回退 CPU，所以 ORT CUDA 回退必须运行在现有 `diarizen` 环境的独立进程/容器，不能在主 TensorRT 进程内假设 CUDA EP 可用。TensorRT plan 与 TRT 版本/GPU 架构绑定；GPU 型号或 TensorRT 大版本变化时从 ONNX 重建。
+
+以上 514ms 是 GPU-only 的 50 条最坏输入突发 p95，不含网络、音频解码、排队前端和后处理。成本公式为：`每请求 GPU 成本 ≈ L4 每小时价格 / 336600`（按 93.5 req/s 满载理论值）；生产按 80% 水位则用 `L4 每小时价格 / 269300`。如果到达率长期低于约 74.8 RPS，一张 L4 是最低成本方案；若硬性要求 50 条同时到达的端到端 p95 显著低于约 0.5s，则必须增加 L4 副本。
 
 ---
 
@@ -408,6 +610,90 @@ conda run --no-capture-output -n diarizen python inference/quantize_segmentation
   --op-types MatMul,Gemm
 ```
 
+### 11.5 L4 固定 10 秒 INT8 variants
+
+```bash
+CUDA_VISIBLE_DEVICES=0 conda run --no-capture-output -n diarizen \
+python inference/benchmark_ort_fixed10s_variants.py \
+  --reference inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_multilabel_hard.onnx \
+  --model dynamic_int8=inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_multilabel_hard.matmul-dynamic-int8.onnx \
+  --model static_int8=inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_multilabel_hard.static-int8.onnx \
+  --model static_int8_entropy_10s=inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_multilabel_hard.static-int8-entropy-10s.onnx \
+  --batch-sizes 1,8,32,50 \
+  --warmup 5 \
+  --repeats 20 \
+  --seeds 1001,1002,1003 \
+  --out-json inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_l4_int8_fixed10s.json
+```
+
+### 11.6 L4 TensorRT 10.10 多精度
+
+```bash
+# 独立 Conda 环境，不修改 diarizen/cosyvoice；可重复执行
+bash inference/setup_tensorrt_l4_conda.sh
+
+CUDA_VISIBLE_DEVICES=0 /root/miniforge3/bin/conda run --no-capture-output \
+  -n diarizen-trt1010 python \
+  inference/benchmark_tensorrt_fixed10s.py \
+  --onnx inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_multilabel_hard.onnx \
+  --engine-dir inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010 \
+  --out-json inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_l4_trt1010_fp16_fixed10s.json \
+  --precision fp16 \
+  --batch-sizes 1,4,8,32 \
+  --workspace-gb 8 \
+  --optimization-level 3 \
+  --warmup 5 \
+  --repeats 20
+
+# FP32+TF32 / strict FP32 / BF16 使用同一脚本切换 --precision。
+# FP8/INT8/INT4 先由 inference/quantize_segmentation_modelopt.py
+# 生成显式 Q/DQ ONNX，再传入同一 benchmark；量化路径会自动创建 STRONGLY_TYPED 网络。
+
+# Conda 迁移后全 28 engine 回归
+CUDA_VISIBLE_DEVICES=0 /root/miniforge3/bin/conda run --no-capture-output \
+  -n diarizen-trt1010 python inference/validate_tensorrt_l4_conda.py \
+  --fp16-engine-dir inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010 \
+  --precision-engine-dir inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions \
+  --artifact-dir /tmp/diarizen_trt_synthetic_refs \
+  --out-json inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_l4_trt1010_conda_all_engines_validation.json
+
+# Detailed inspector 汇总
+/root/miniforge3/bin/conda run --no-capture-output -n diarizen-trt1010 \
+  python inference/analyze_trt_engine_inspectors.py \
+  --engine-dir inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions \
+  --out-json inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_l4_trt1010_engine_inspector_analysis.json
+```
+
+### 11.7 L4 线上 16 秒与并发 50
+
+```bash
+# 固定 16 秒、各 batch
+CUDA_VISIBLE_DEVICES=0 /root/miniforge3/bin/conda run --no-capture-output \
+  -n diarizen-trt1010 python inference/benchmark_tensorrt_fixed10s.py \
+  --onnx inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_multilabel_hard.onnx \
+  --engine-dir inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s \
+  --out-json inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_l4_trt1010_fp16_fixed16s.json \
+  --input-seconds 16 --batch-sizes 1,2,4,8,16,32 --precision fp16 \
+  --workspace-gb 8 --optimization-level 3 --warmup 10 --repeats 50
+
+# batch=1、50 请求、跨 inference streams
+CUDA_VISIBLE_DEVICES=0 /root/miniforge3/bin/conda run --no-capture-output \
+  -n diarizen-trt1010 python inference/benchmark_trt_online_burst.py \
+  --engine inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s/segmentation_16s_bs1_fp16.plan \
+  --input-seconds 16 --requests 50 --streams 1,2,4,8 \
+  --warmup-bursts 3 --repeats 30 \
+  --out-json inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_l4_trt1010_fp16_16s_burst50.json
+
+# 一个 batch=1 动态时长 profile
+CUDA_VISIBLE_DEVICES=0 /root/miniforge3/bin/conda run --no-capture-output \
+  -n diarizen-trt1010 python inference/benchmark_trt_dynamic_duration.py \
+  --onnx inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_multilabel_hard.onnx \
+  --engine inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_dynamic/segmentation_bs1_2s-16s_opt10s_fp16.plan \
+  --out-json inference/models/kaldi_merged_1219_all_ft_large/epoch_0016_l4_trt1010_fp16_dynamic_duration_bs1.json \
+  --profile-seconds 2,10,16 --benchmark-seconds 2,4,6,8,10,12,13,14,16 \
+  --workspace-gb 8 --warmup 10 --repeats 100
+```
+
 ---
 
 ## 12. 产物与脚本索引
@@ -417,6 +703,18 @@ conda run --no-capture-output -n diarizen python inference/quantize_segmentation
 | 文件 | 说明 |
 |------|------|
 | `inference/benchmark_segmentation_precision.py` | 速度 + 精度 benchmark |
+| `inference/benchmark_ort_fixed10s_variants.py` | L4 上多个 ORT/INT8 模型的固定 10s 速度、provider 分配与 synthetic 一致性 |
+| `inference/benchmark_tensorrt_fixed10s.py` | 构建固定 shape TensorRT FP32/TF32/FP16/BF16/FP8/INT8/INT4 engines、导出 inspector 并测速 |
+| `inference/benchmark_trt_fixed10s_parity.py` | ORT FP32 reference 与各 TensorRT 精度 hard multilabel synthetic parity |
+| `inference/benchmark_trt_online_burst.py` | 固定 batch=1 engine 的 50 请求、跨 execution context/stream 突发压测 |
+| `inference/benchmark_trt_dynamic_duration.py` | 构建 batch=1、2–16s 动态时长 profile 并逐时长测速 |
+| `inference/generate_adversarial_synthetic_10s.py` | 生成能激活正类的 10 秒 adversarial synthetic waveform |
+| `inference/diagnose_tensorrt_build.py` | TensorRT 最小网络、ONNX parse、FP32/FP16 build 隔离诊断 |
+| `inference/quantize_segmentation_modelopt.py` | ModelOpt FP8/INT8 explicit Q/DQ 与 INT4 weight-only 图生成 |
+| `inference/setup_tensorrt_l4_conda.sh` | 幂等创建/修复 `diarizen-trt1010` Conda env，并验证版本、依赖与 GPU |
+| `inference/tensorrt_l4_requirements.txt` | TensorRT 10.10 与 CUDA runtime 精确版本锁定 |
+| `inference/validate_tensorrt_l4_conda.py` | 在 Conda env 中执行全部 28 个 engine，并检查 parity 与重复执行确定性 |
+| `inference/analyze_trt_engine_inspectors.py` | 汇总 Q/DQ、Reformat、datatype 和低精度 MatMul/Gemm 命中率 |
 | `inference/quantize_segmentation_onnx_static.py` | Static INT8 QDQ 量化 |
 | `inference/run_export_kaldi_merged_1219_all_ft_large_epoch_0002.sh` | ONNX 导出 |
 
@@ -428,6 +726,19 @@ conda run --no-capture-output -n diarizen python inference/quantize_segmentation
 | `epoch_0016_precision_benchmark.json` | 速度 + FP32/FP16 精度 |
 | `epoch_0016_int8_accuracy_report.json` | dynamic INT8 逐文件精度 |
 | `epoch_0016_static_int8_accuracy_report.json` | static INT8 逐文件精度 |
+| `epoch_0016_l4_baseline.json` | L4 PyTorch FP32/FP16 与 ORT FP32 固定 10s 基线 |
+| `epoch_0016_l4_dynamic_int8_fixed10s.json` | L4 dynamic INT8 固定 10s 结果 |
+| `epoch_0016_l4_static_int8_fixed10s.json` | L4 两种 static INT8 固定 10s 结果 |
+| `epoch_0016_l4_trt1010_fp16_fixed10s.json` | L4 TensorRT 10.10 FP16 速度、构建和 synthetic parity 汇总 |
+| `epoch_0016_l4_trt1010_all_precisions_fixed10s.json` | L4 TensorRT 全精度速度、inspector 证据与 synthetic parity 汇总 |
+| `epoch_0016_l4_trt1010_conda_all_engines_validation.json` | Conda 迁移后 28-engine 执行、parity 与 repeat exact 回归 |
+| `epoch_0016_l4_trt1010_engine_inspector_analysis.json` | 24 个多精度 engine inspector 的 Q/DQ/Reformat/GEMM 汇总 |
+| `epoch_0016_l4_trt1010_fp16_fixed16s.json` | L4 TensorRT FP16 固定 16s、bs=1/2/4/8/16/32 结果 |
+| `epoch_0016_l4_trt1010_fp16_fixed16s_parity.json` | 固定 16s TensorRT FP16 与 ORT FP32 synthetic parity |
+| `epoch_0016_l4_trt1010_fp16_16s_burst50.json` | 50 个 16s 请求在 1/2/4/8 contexts 下的完成延迟与吞吐 |
+| `epoch_0016_l4_trt1010_fp16_16s_burst50_memory.json` | 1/2 contexts 的短复测与设备内存占用 |
+| `epoch_0016_l4_trt1010_fp16_dynamic_duration_bs1.json` | batch=1 动态 2–16s profile 的逐时长结果 |
+| `epoch_0016_l4_ort_fp32_synthetic16s_reference.json` | 固定 16s ORT CPU FP32 synthetic reference 元数据 |
 
 ### 12.3 本地模型文件（**.gitignore 排除，不入库**）
 
@@ -437,6 +748,12 @@ conda run --no-capture-output -n diarizen python inference/quantize_segmentation
 | `epoch_0016_multilabel_hard.matmul-dynamic-int8.onnx` | 98 MB |
 | `epoch_0016_multilabel_hard.static-int8.onnx` | 99 MB |
 | `epoch_0016_multilabel_hard.static-int8-entropy-10s.onnx` | 99 MB |
+| `epoch_0016_multilabel_hard.modelopt-{fp8,int8}.onnx` | 约 141 MB，显式 Q/DQ |
+| `epoch_0016_multilabel_hard.modelopt-int4-trt.onnx` | 约 136 MB，128 个 INT4 DQ 权重 |
+| `trt_l4_trt1010/segmentation_10s_bs{1,4,8,32}_fp16.plan` | 164–385 MB |
+| `trt_l4_trt1010_16s/segmentation_16s_bs{1,2,4,8,16,32}_fp16.plan` | 163–502 MiB；生产只需 bs=1 |
+| `trt_l4_trt1010_dynamic/segmentation_bs1_2s-16s_opt10s_fp16.plan` | 153.7 MiB；动态时长、固定 batch=1 |
+| `trt_l4_precisions/segmentation_10s_bs{1,4,8,32}_{fp32_tf32,fp32,bf16,fp8,int8,int4}.plan` | 多精度 engines 与 inspector JSON |
 
 ---
 
@@ -444,22 +761,32 @@ conda run --no-capture-output -n diarizen python inference/quantize_segmentation
 
 ### 13.1 结论
 
-1. **生产首选**：`epoch_0016_multilabel_hard.onnx` + ORT CUDA FP32
-2. **50 路 10s 并发**：A800 上约 **233 ms** 完成，分割不是瓶颈
-3. **INT8 PTQ 全面失败**：dynamic 慢、static 精度崩，均不采用
-4. **TensorRT FP8 方案**：理论最优但需 L4 环境，本机无法验证
+1. **L4 固定 10s 性能首选**：TensorRT 10.10 FP16；ORT CUDA FP32 保留为生产回退。
+2. **L4 固定 10s 实测**：bs=1/8/32/50 为 **20.5/163.0/748.7/1184.2 ms**；bs=50 约为 A800 的 5.1× 延迟。
+3. **L4 ORT INT8 不可取**：dynamic/static 均慢于 FP32，且 bs=50 OOM；全静音/噪声 synthetic 100% 一致不代表真实音频精度可接受。
+4. **TensorRT FP16 问题已解决**：10.0.1 的 builder 段错误通过独立升级到 10.10.0.31 解决；四个固定 shape engine 全部成功。
+5. **TensorRT FP16 是全精度实测冠军**：FP8/INT8 确实命中低精度层，但分别慢约 11–26% / 3–13%；INT8 synthetic 精度严重失真且重复执行非完全确定。
+6. **INT4/FP4 不适合 L4**：INT4 仅压缩部分权重、实际 Float 计算且更慢；FP4 需要 Blackwell，Ada L4 不支持。
+7. **线上最长 16s 时仍选 FP16 batch=1**：10.741ms/条；batch=32 每条 17.021ms，吞吐反而下降 36.9%。
+8. **并发 50 使用两个 contexts**：50 条最坏输入总完成约 534.8ms，请求完成 p95 约 514.3ms，吞吐约 93.5 req/s；4/8 contexts 更慢。
+9. **一张 L4 是最低成本起点**：按 80% 水位承接约 74.8 个最坏 16s 请求/秒；更高持续到达率或更低突发 p95 SLA 才扩卡。
+10. **时长路由避免无谓补零**：动态 2–16s plan 配合固定 10s/16s plan；不使用大 batch 或当前 INT8/FP8/INT4 路线。
 
-### 13.2 后续工作（按优先级）
+### 13.2 收尾状态与外部约束
 
-| 优先级 | 任务 | 环境要求 |
-|--------|------|----------|
-| P0 | L4 上跑 TensorRT FP16 engine | L4 + TRT |
-| P0 | L4 上跑 selective FP8 | L4 + TRT |
-| P1 | 修复 ORT CUDA 长音频 Gather bug | 改 ONNX 导出或 ORT 版本 |
-| P1 | SmoothQuant INT8 alpha 扫描 | L4 + TRT |
-| P2 | 选择性 QAT（若 PTQ 不达标） | GPU 训练 |
-| P2 | PyTorch 在线 25 层 FP32 加权（降显存） | 代码改动 |
+| 项目 | 状态 | 说明 |
+|------|------|------|
+| TensorRT Conda 环境与版本锁定 | ✅ 完成 | `setup_tensorrt_l4_conda.sh` 可幂等复现；`pip check` 通过 |
+| 全部固定 10s engines 回归 | ✅ 完成 | 7 种路径 × 4 个 batch，共 28 个 plan 全部执行成功 |
+| Q/DQ / Reformat / GEMM 分析 | ✅ 完成 | 使用 detailed engine inspector，不依赖缺失的 `trtexec/nsys` |
+| CUDA stream 正确性 | ✅ 完成 | parity/validation/benchmark 均加入跨 stream 同步；验证增加 warmup 与 repeat exact |
+| 固定 16s 容量与 batch 扫描 | ✅ 完成 | FP16 bs=1/2/4/8/16/32，均 50 次计时 |
+| 并发 50 调度扫描 | ✅ 完成 | batch=1 的 1/2/4/8 contexts；2 contexts 最佳 |
+| 动态时长与路由切点 | ✅ 完成 | 2/4/6/8/10/12/13/14/16s synthetic 测速 |
+| 真实音频 DER/JER | 按约束不执行 | 用户明确要求只跑 10 秒 synthetic，不跑真实音频 |
+| SmoothQuant alpha 扫描 | 当前工具链不具备 | ModelOpt 0.46 ONNX 无 SmoothQuant；需要新增图变换或训练工具链，且普通 INT8 已精度失败并非确定 |
+| 部署镜像/注册表推送 | 无目标可执行 | 尚未提供镜像仓库、服务入口或部署目标；环境脚本与 engines 已就绪 |
 
 ---
 
-*报告生成：DiariZen inference benchmark，2026-08-26*
+*报告更新：DiariZen inference benchmark，2026-08-27*

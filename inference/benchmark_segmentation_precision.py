@@ -36,13 +36,28 @@ def _percentile(xs: List[float], q: float) -> float:
     return float(xs_sorted[k])
 
 
+class PowersetToMultilabelHard(torch.nn.Module):
+    """Match the hard powerset decoding embedded in the exported ONNX model."""
+
+    def __init__(self, base_model: torch.nn.Module):
+        super().__init__()
+        self.base_model = base_model
+        assert getattr(base_model.specifications, "powerset", False), "expected powerset model"
+        self.register_buffer("mapping", base_model.powerset.mapping.float(), persistent=False)
+
+    def forward(self, waveforms: torch.Tensor) -> torch.Tensor:
+        powerset_logprobs = self.base_model(waveforms)
+        indices = torch.argmax(powerset_logprobs, dim=-1)
+        return self.mapping[indices]
+
+
 def load_pytorch_model(config: Path, ckpt: Path, device: torch.device, dtype: torch.dtype) -> torch.nn.Module:
     cfg = toml.load(config)
     model = instantiate(cfg["model"]["path"], args=cfg["model"]["args"].copy())
     sd = torch.load(ckpt, map_location="cpu")
     model.load_state_dict(sd, strict=True)
     model.eval().to(device=device, dtype=dtype)
-    return model
+    return PowersetToMultilabelHard(model).to(device=device, dtype=dtype).eval()
 
 
 @torch.inference_mode()
@@ -177,7 +192,17 @@ def bench_trt(engine_path: Path, batch_size: int, *, warmup: int = 5, repeats: i
 
     x = torch.zeros(batch_size, 1, SAMPLES_10S, device="cuda", dtype=torch.float32)
     out_shape = context.get_tensor_shape(out_name)
-    y = torch.empty(tuple(out_shape), device="cuda", dtype=torch.float32)
+    output_dtype = engine.get_tensor_dtype(out_name)
+    trt_to_torch = {
+        trt.float32: torch.float32,
+        trt.float16: torch.float16,
+        trt.int32: torch.int32,
+        trt.int8: torch.int8,
+        trt.bool: torch.bool,
+    }
+    if output_dtype not in trt_to_torch:
+        raise TypeError(f"Unsupported TensorRT output dtype: {output_dtype}")
+    y = torch.empty(tuple(out_shape), device="cuda", dtype=trt_to_torch[output_dtype])
     context.set_tensor_address(inp_name, int(x.data_ptr()))
     context.set_tensor_address(out_name, int(y.data_ptr()))
     stream = torch.cuda.Stream()
@@ -299,6 +324,18 @@ def main() -> None:
     parser.add_argument("--calibration-root", action="append", default=[])
     parser.add_argument("--mode", type=str, default="all", choices=["all", "speed", "accuracy"])
     parser.add_argument("--skip-trt", action="store_true")
+    parser.add_argument(
+        "--engine-dir",
+        type=str,
+        default=str(REPO / "inference" / "models" / "kaldi_merged_1219_all_ft_large" / "trt_l4"),
+    )
+    parser.add_argument(
+        "--tensorrt-python-path",
+        type=str,
+        default="",
+        help="Optional site-packages directory containing TensorRT bindings.",
+    )
+    parser.add_argument("--trt-workspace-gb", type=int, default=8)
     parser.add_argument("--accuracy-ref", type=str, default="pytorch_fp32_cpu", choices=["pytorch_fp32_cpu", "pytorch_fp16_gpu"])
     args = parser.parse_args()
 
@@ -337,6 +374,8 @@ def main() -> None:
 
         if not args.skip_trt and args.mode in ("all", "speed"):
             try:
+                if args.tensorrt_python_path:
+                    sys.path.append(args.tensorrt_python_path)
                 import tensorrt  # noqa: F401
 
                 engine_dir = Path(args.engine_dir)
@@ -344,7 +383,13 @@ def main() -> None:
                 for bs in batch_sizes:
                     eng = engine_dir / f"seg_fp16_bs{bs}.engine"
                     if not eng.is_file():
-                        build_trt_engine(onnx_path, eng, bs, fp16=True)
+                        build_trt_engine(
+                            onnx_path,
+                            eng,
+                            bs,
+                            fp16=True,
+                            workspace_gb=args.trt_workspace_gb,
+                        )
                     trt_results["batches"][str(bs)] = bench_trt(eng, bs)
                 report["speed"]["tensorrt_fp16"] = trt_results
             except Exception as e:

@@ -1,0 +1,90 @@
+{
+  "scope": "fixed 10-second synthetic inputs only; no real audio or DER/JER",
+  "gpu": "NVIDIA L4 24GB",
+  "driver": "535.129.03",
+  "tensorrt_version": "10.10.0.31",
+  "torch_version": "2.3.1+cu121",
+  "nvidia_cuda_runtime_cu12": "12.1.105",
+  "onnxruntime_reference_version": "1.22.0",
+  "input_shape": "[B, 1, 160000]",
+  "precision": "TensorRT FP16 with TensorRT-selected higher-precision fallbacks",
+  "warmup": 5,
+  "repeats": 20,
+  "builder_optimization_level": 3,
+  "workspace_gb": 8,
+  "results": {
+    "1": {
+      "mean_ms": 6.283,
+      "p50_ms": 6.418,
+      "p95_ms": 6.434,
+      "per_item_ms": 6.283,
+      "audio_seconds_per_second": 1591.5,
+      "ort_fp32_mean_ms": 20.49,
+      "speedup_vs_ort_fp32": 3.261,
+      "engine_bytes": 163620996,
+      "build_seconds": 175.511
+    },
+    "4": {
+      "mean_ms": 25.662,
+      "p50_ms": 25.704,
+      "p95_ms": 26.0,
+      "per_item_ms": 6.415,
+      "audio_seconds_per_second": 1558.8,
+      "ort_fp32_mean_ms": 75.97,
+      "speedup_vs_ort_fp32": 2.961,
+      "engine_bytes": 184391564,
+      "build_seconds": 219.281
+    },
+    "8": {
+      "mean_ms": 53.45,
+      "p50_ms": 53.2,
+      "p95_ms": 55.965,
+      "per_item_ms": 6.681,
+      "audio_seconds_per_second": 1496.7,
+      "ort_fp32_mean_ms": 162.99,
+      "speedup_vs_ort_fp32": 3.049,
+      "engine_bytes": 210382860,
+      "build_seconds": 241.928
+    },
+    "32": {
+      "mean_ms": 240.275,
+      "p50_ms": 239.981,
+      "p95_ms": 241.748,
+      "per_item_ms": 7.509,
+      "audio_seconds_per_second": 1331.8,
+      "ort_fp32_mean_ms": 748.72,
+      "speedup_vs_ort_fp32": 3.117,
+      "engine_bytes": 385375060,
+      "build_seconds": 366.896
+    }
+  },
+  "synthetic_parity_vs_ort_fp32": {
+    "input": "gradient-generated 10-second adversarial synthetic waveform; 480 positive cells per item in ORT reference",
+    "1": {
+      "cell_exact_match_pct": 100.0,
+      "frame_exact_match_pct": 100.0,
+      "mismatched_frames": 0
+    },
+    "4": {
+      "cell_exact_match_pct": 99.937375,
+      "frame_exact_match_pct": 99.749499,
+      "mismatched_frames": 5
+    },
+    "8": {
+      "cell_exact_match_pct": 99.9499,
+      "frame_exact_match_pct": 99.799599,
+      "mismatched_frames": 8
+    },
+    "32": {
+      "cell_exact_match_pct": 99.88884,
+      "frame_exact_match_pct": 99.555361,
+      "mismatched_frames": 71
+    }
+  },
+  "engine_directory": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010",
+  "notes": [
+    "TensorRT 10.0.1 reproducibly segfaulted during FP16 build; upgrading in an isolated venv to 10.10.0.31 resolved the builder failure.",
+    "TensorRT warned about FP16 LayerNorm overflow risk and selected higher precision for relevant Reduce/Pow operations.",
+    "Serialized plans are specific to the TensorRT/GPU environment and are excluded from git."
+  ]
+}

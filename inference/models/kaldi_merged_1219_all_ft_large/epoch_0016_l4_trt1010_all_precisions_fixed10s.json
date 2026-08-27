@@ -1,0 +1,106 @@
+{
+  "scope": "segmentation only; fixed 10-second synthetic input; no real audio or DER/JER",
+  "gpu": "NVIDIA L4 24GB (Ada, compute capability 8.9)",
+  "tensorrt_version": "10.10.0.31",
+  "conda_environment": {
+    "name": "diarizen-trt1010",
+    "path": "/root/miniforge3/envs/diarizen-trt1010",
+    "python": "3.10.18",
+    "pytorch": "2.3.1+cu121",
+    "cuda_runtime_package": "nvidia-cuda-runtime-cu12==12.1.105",
+    "migrated_from_python_venv_on": "2026-08-27",
+    "old_venv_backup": "/root/miniforge3/envs/diarizen-trt1010-venv-backup-20260827",
+    "migration_validation": "All 28 fixed-10s engines deserialized and executed successfully in the Conda environment"
+  },
+  "warmup": 5,
+  "repeats": 20,
+  "input_shape_template": ["B", 1, 160000],
+  "reference_backend": "ONNX Runtime CUDA FP32 hard multilabel",
+  "results": {
+    "fp32_tf32": {
+      "inspector_evidence": "462-474 Float layer markers; TF32 enabled",
+      "batches": {
+        "1": {"mean_ms": 13.361, "p50_ms": 13.356, "p95_ms": 13.441, "audio_seconds_per_second": 748.4, "frame_exact_match_pct": 100.0},
+        "4": {"mean_ms": 55.502, "p50_ms": 55.098, "p95_ms": 56.856, "audio_seconds_per_second": 720.7, "frame_exact_match_pct": 99.749499},
+        "8": {"mean_ms": 116.962, "p50_ms": 116.842, "p95_ms": 119.911, "audio_seconds_per_second": 684.0, "frame_exact_match_pct": 99.799599},
+        "32": {"mean_ms": 526.436, "p50_ms": 526.281, "p95_ms": 530.122, "audio_seconds_per_second": 607.9, "frame_exact_match_pct": 99.574148}
+      }
+    },
+    "fp32_strict": {
+      "inspector_evidence": "458-465 Float layer markers; TF32 disabled",
+      "batches": {
+        "1": {"mean_ms": 17.249, "p50_ms": 17.259, "p95_ms": 17.372, "audio_seconds_per_second": 579.8, "frame_exact_match_pct": 100.0},
+        "4": {"mean_ms": 68.271, "p50_ms": 67.740, "p95_ms": 70.296, "audio_seconds_per_second": 585.9, "frame_exact_match_pct": 99.749499},
+        "8": {"mean_ms": 147.735, "p50_ms": 147.723, "p95_ms": 151.879, "audio_seconds_per_second": 541.5, "frame_exact_match_pct": 99.824649},
+        "32": {"mean_ms": 616.571, "p50_ms": 617.072, "p95_ms": 621.197, "audio_seconds_per_second": 519.0, "frame_exact_match_pct": 99.574148}
+      }
+    },
+    "fp16_mixed": {
+      "inspector_evidence": "FP16 builder with TensorRT high-precision LayerNorm fallback",
+      "batches": {
+        "1": {"mean_ms": 6.283, "p50_ms": 6.418, "p95_ms": 6.434, "audio_seconds_per_second": 1591.5, "frame_exact_match_pct": 100.0},
+        "4": {"mean_ms": 25.662, "p50_ms": 25.704, "p95_ms": 26.000, "audio_seconds_per_second": 1558.8, "frame_exact_match_pct": 99.749499},
+        "8": {"mean_ms": 53.450, "p50_ms": 53.200, "p95_ms": 55.965, "audio_seconds_per_second": 1496.7, "frame_exact_match_pct": 99.799599},
+        "32": {"mean_ms": 240.275, "p50_ms": 239.981, "p95_ms": 241.748, "audio_seconds_per_second": 1331.8, "frame_exact_match_pct": 99.555361}
+      }
+    },
+    "bf16_mixed": {
+      "inspector_evidence": "175-176 BF16 layer markers",
+      "batches": {
+        "1": {"mean_ms": 9.755, "p50_ms": 9.791, "p95_ms": 9.811, "audio_seconds_per_second": 1025.1, "frame_exact_match_pct": 100.0},
+        "4": {"mean_ms": 37.925, "p50_ms": 37.822, "p95_ms": 38.828, "audio_seconds_per_second": 1054.7, "frame_exact_match_pct": 99.749499},
+        "8": {"mean_ms": 78.789, "p50_ms": 78.678, "p95_ms": 80.242, "audio_seconds_per_second": 1015.4, "frame_exact_match_pct": 99.824649},
+        "32": {"mean_ms": 352.353, "p50_ms": 352.510, "p95_ms": 354.801, "audio_seconds_per_second": 908.2, "frame_exact_match_pct": 99.010521}
+      }
+    },
+    "fp8_explicit_qdq": {
+      "inspector_evidence": "330-331 FP8 layer markers; strongly typed network",
+      "batches": {
+        "1": {"mean_ms": 6.982, "p50_ms": 7.037, "p95_ms": 7.121, "audio_seconds_per_second": 1432.2, "frame_exact_match_pct": 99.398798},
+        "4": {"mean_ms": 31.444, "p50_ms": 31.420, "p95_ms": 31.904, "audio_seconds_per_second": 1272.1, "frame_exact_match_pct": 99.298597},
+        "8": {"mean_ms": 66.072, "p50_ms": 65.750, "p95_ms": 67.366, "audio_seconds_per_second": 1210.8, "frame_exact_match_pct": 99.348697},
+        "32": {"mean_ms": 302.986, "p50_ms": 303.457, "p95_ms": 304.766, "audio_seconds_per_second": 1056.2, "frame_exact_match_pct": 98.991733}
+      }
+    },
+    "int8_explicit_qdq": {
+      "inspector_evidence": "206-207 INT8 layer markers; strongly typed network",
+      "accuracy_status": "failed synthetic parity and repeat determinism; positive count is similar but locations are mostly wrong",
+      "batches": {
+        "1": {"mean_ms": 6.502, "p50_ms": 6.578, "p95_ms": 6.614, "audio_seconds_per_second": 1537.9, "frame_exact_match_pct": 0.200401, "cell_exact_match_pct": 52.555110, "repeat_exact_match_pct": 99.799599},
+        "4": {"mean_ms": 28.726, "p50_ms": 28.731, "p95_ms": 29.148, "audio_seconds_per_second": 1392.4, "frame_exact_match_pct": 0.501002, "cell_exact_match_pct": 52.642786, "repeat_exact_match_pct": 99.799599},
+        "8": {"mean_ms": 60.439, "p50_ms": 60.381, "p95_ms": 61.409, "audio_seconds_per_second": 1323.6, "frame_exact_match_pct": 0.400802, "cell_exact_match_pct": 52.642786, "repeat_exact_match_pct": 99.830912},
+        "32": {"mean_ms": 270.433, "p50_ms": 270.978, "p95_ms": 273.285, "audio_seconds_per_second": 1183.3, "frame_exact_match_pct": 0.394539, "cell_exact_match_pct": 52.650614, "repeat_exact_match_pct": 99.898234}
+      }
+    },
+    "int4_weight_only": {
+      "inspector_evidence": "128 INT4 DQ weights but zero INT4 compute markers; Float compute",
+      "quantization_note": "56 weight nodes with dimensions not divisible by block size 128 were excluded",
+      "batches": {
+        "1": {"mean_ms": 13.702, "p50_ms": 13.707, "p95_ms": 13.812, "audio_seconds_per_second": 729.8, "frame_exact_match_pct": 96.793587},
+        "4": {"mean_ms": 55.930, "p50_ms": 55.685, "p95_ms": 57.485, "audio_seconds_per_second": 715.2, "frame_exact_match_pct": 96.793587},
+        "8": {"mean_ms": 120.233, "p50_ms": 119.859, "p95_ms": 123.031, "audio_seconds_per_second": 665.4, "frame_exact_match_pct": 96.793587},
+        "32": {"mean_ms": 534.227, "p50_ms": 535.347, "p95_ms": 539.005, "audio_seconds_per_second": 599.0, "frame_exact_match_pct": 96.793587}
+      }
+    },
+    "fp4_nvfp4": {
+      "status": "not benchmarked: unsupported by NVIDIA L4/Ada; native FP4 requires Blackwell"
+    }
+  },
+  "engine_validation": {
+    "engine_count": 28,
+    "non_int8_repeat_exact_match_pct": 100.0,
+    "int8_repeat_exact_match_pct_range": [99.799599, 99.898234],
+    "validation_artifact": "epoch_0016_l4_trt1010_conda_all_engines_validation.json"
+  },
+  "inspector_analysis": {
+    "fp8_qdq_layer_pct_range": [48.747, 62.014],
+    "fp8_reformat_layer_pct_range": [4.457, 5.654],
+    "fp8_matmul_gemm_hit_pct_range": [85.053, 85.315],
+    "int8_qdq_layer_pct_range": [43.333, 47.806],
+    "int8_reformat_layer_pct_range": [6.667, 7.39],
+    "int8_matmul_gemm_hit_pct_range": [87.363, 87.701],
+    "int4_matmul_gemm_hit_pct": 0.0,
+    "artifact": "epoch_0016_l4_trt1010_engine_inspector_analysis.json"
+  },
+  "recommendation": "TensorRT 10.10 FP16 mixed precision for fixed 10-second L4 inference; retain ORT CUDA FP32 as fallback; reject current INT8 for accuracy and nondeterminism"
+}

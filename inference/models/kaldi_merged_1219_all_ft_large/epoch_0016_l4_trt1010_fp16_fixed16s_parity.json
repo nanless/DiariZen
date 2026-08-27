@@ -1,0 +1,115 @@
+{
+  "backend": "TensorRT fp16",
+  "tensorrt_version": "10.10.0.31",
+  "gpu": "NVIDIA L4",
+  "batches": {
+    "1": {
+      "output_shape": [
+        1,
+        799,
+        4
+      ],
+      "cell_exact_match_pct": 100.0,
+      "frame_exact_match_pct": 100.0,
+      "mismatched_cells": 0,
+      "mismatched_frames": 0,
+      "max_abs_diff": 0.0,
+      "actual_value_counts": {
+        "0.0": 3196
+      },
+      "reference_value_counts": {
+        "0.0": 3196
+      }
+    },
+    "2": {
+      "output_shape": [
+        2,
+        799,
+        4
+      ],
+      "cell_exact_match_pct": 100.0,
+      "frame_exact_match_pct": 100.0,
+      "mismatched_cells": 0,
+      "mismatched_frames": 0,
+      "max_abs_diff": 0.0,
+      "actual_value_counts": {
+        "0.0": 6392
+      },
+      "reference_value_counts": {
+        "0.0": 6392
+      }
+    },
+    "4": {
+      "output_shape": [
+        4,
+        799,
+        4
+      ],
+      "cell_exact_match_pct": 100.0,
+      "frame_exact_match_pct": 100.0,
+      "mismatched_cells": 0,
+      "mismatched_frames": 0,
+      "max_abs_diff": 0.0,
+      "actual_value_counts": {
+        "0.0": 12784
+      },
+      "reference_value_counts": {
+        "0.0": 12784
+      }
+    },
+    "8": {
+      "output_shape": [
+        8,
+        799,
+        4
+      ],
+      "cell_exact_match_pct": 100.0,
+      "frame_exact_match_pct": 100.0,
+      "mismatched_cells": 0,
+      "mismatched_frames": 0,
+      "max_abs_diff": 0.0,
+      "actual_value_counts": {
+        "0.0": 25568
+      },
+      "reference_value_counts": {
+        "0.0": 25568
+      }
+    },
+    "16": {
+      "output_shape": [
+        16,
+        799,
+        4
+      ],
+      "cell_exact_match_pct": 100.0,
+      "frame_exact_match_pct": 100.0,
+      "mismatched_cells": 0,
+      "mismatched_frames": 0,
+      "max_abs_diff": 0.0,
+      "actual_value_counts": {
+        "0.0": 51136
+      },
+      "reference_value_counts": {
+        "0.0": 51136
+      }
+    },
+    "32": {
+      "output_shape": [
+        32,
+        799,
+        4
+      ],
+      "cell_exact_match_pct": 100.0,
+      "frame_exact_match_pct": 100.0,
+      "mismatched_cells": 0,
+      "mismatched_frames": 0,
+      "max_abs_diff": 0.0,
+      "actual_value_counts": {
+        "0.0": 102272
+      },
+      "reference_value_counts": {
+        "0.0": 102272
+      }
+    }
+  }
+}

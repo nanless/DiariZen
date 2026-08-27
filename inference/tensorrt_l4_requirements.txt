@@ -1,0 +1,2 @@
+tensorrt-cu12==10.10.0.31
+nvidia-cuda-runtime-cu12==12.1.105

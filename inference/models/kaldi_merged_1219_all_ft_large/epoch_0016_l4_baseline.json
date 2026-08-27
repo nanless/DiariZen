@@ -1,0 +1,120 @@
+{
+  "input_shape": "[B, 1, 160000]",
+  "audio_sec": 10,
+  "gpu": "NVIDIA L4",
+  "speed": {
+    "pytorch_fp32": {
+      "backend": "pytorch_fp32",
+      "batches": {
+        "1": {
+          "wall_ms_mean": 30.02,
+          "wall_ms_p50": 30.01,
+          "wall_ms_p95": 30.24,
+          "per_item_ms": 30.018,
+          "audio_sec_per_s": 333.1,
+          "rtf": 0.003
+        },
+        "8": {
+          "wall_ms_mean": 250.37,
+          "wall_ms_p50": 250.43,
+          "wall_ms_p95": 251.58,
+          "per_item_ms": 31.297,
+          "audio_sec_per_s": 319.5,
+          "rtf": 0.00313
+        },
+        "32": {
+          "wall_ms_mean": 1063.89,
+          "wall_ms_p50": 1064.01,
+          "wall_ms_p95": 1068.07,
+          "per_item_ms": 33.247,
+          "audio_sec_per_s": 300.8,
+          "rtf": 0.00332
+        },
+        "50": {
+          "wall_ms_mean": 1696.65,
+          "wall_ms_p50": 1698.73,
+          "wall_ms_p95": 1701.84,
+          "per_item_ms": 33.933,
+          "audio_sec_per_s": 294.7,
+          "rtf": 0.00339
+        }
+      }
+    },
+    "pytorch_fp16": {
+      "backend": "pytorch_fp16",
+      "batches": {
+        "1": {
+          "wall_ms_mean": 27.53,
+          "wall_ms_p50": 27.52,
+          "wall_ms_p95": 27.76,
+          "per_item_ms": 27.53,
+          "audio_sec_per_s": 363.2,
+          "rtf": 0.00275
+        },
+        "8": {
+          "wall_ms_mean": 164.55,
+          "wall_ms_p50": 164.75,
+          "wall_ms_p95": 165.85,
+          "per_item_ms": 20.568,
+          "audio_sec_per_s": 486.2,
+          "rtf": 0.00206
+        },
+        "32": {
+          "wall_ms_mean": 749.01,
+          "wall_ms_p50": 748.83,
+          "wall_ms_p95": 750.7,
+          "per_item_ms": 23.407,
+          "audio_sec_per_s": 427.2,
+          "rtf": 0.00234
+        },
+        "50": {
+          "wall_ms_mean": 1184.71,
+          "wall_ms_p50": 1184.46,
+          "wall_ms_p95": 1186.68,
+          "per_item_ms": 23.694,
+          "audio_sec_per_s": 422.0,
+          "rtf": 0.00237
+        }
+      }
+    },
+    "ort_cuda_fp32": {
+      "backend": "ort_cuda",
+      "batches": {
+        "1": {
+          "wall_ms_mean": 20.49,
+          "wall_ms_p50": 20.48,
+          "wall_ms_p95": 20.65,
+          "per_item_ms": 20.488,
+          "audio_sec_per_s": 488.1,
+          "rtf": 0.00205
+        },
+        "8": {
+          "wall_ms_mean": 162.99,
+          "wall_ms_p50": 163.24,
+          "wall_ms_p95": 163.65,
+          "per_item_ms": 20.373,
+          "audio_sec_per_s": 490.8,
+          "rtf": 0.00204
+        },
+        "32": {
+          "wall_ms_mean": 748.72,
+          "wall_ms_p50": 748.53,
+          "wall_ms_p95": 750.34,
+          "per_item_ms": 23.398,
+          "audio_sec_per_s": 427.4,
+          "rtf": 0.00234
+        },
+        "50": {
+          "wall_ms_mean": 1184.15,
+          "wall_ms_p50": 1184.48,
+          "wall_ms_p95": 1185.72,
+          "per_item_ms": 23.683,
+          "audio_sec_per_s": 422.2,
+          "rtf": 0.00237
+        }
+      }
+    }
+  },
+  "accuracy": {},
+  "notes": []
+}

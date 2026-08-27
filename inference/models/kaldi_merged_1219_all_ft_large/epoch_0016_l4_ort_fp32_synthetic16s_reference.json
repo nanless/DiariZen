@@ -1,0 +1,75 @@
+{
+  "reference_backend": "ORT CPUExecutionProvider FP32",
+  "onnxruntime_version": "1.18.0",
+  "session_providers": [
+    "CPUExecutionProvider"
+  ],
+  "batches": {
+    "1": {
+      "artifact": "/tmp/diarizen_trt_synthetic_refs_16s/ort_fp32_synthetic_16s_bs1.npz",
+      "output_shape": [
+        1,
+        799,
+        4
+      ],
+      "output_value_counts": {
+        "0.0": 3196
+      }
+    },
+    "2": {
+      "artifact": "/tmp/diarizen_trt_synthetic_refs_16s/ort_fp32_synthetic_16s_bs2.npz",
+      "output_shape": [
+        2,
+        799,
+        4
+      ],
+      "output_value_counts": {
+        "0.0": 6392
+      }
+    },
+    "4": {
+      "artifact": "/tmp/diarizen_trt_synthetic_refs_16s/ort_fp32_synthetic_16s_bs4.npz",
+      "output_shape": [
+        4,
+        799,
+        4
+      ],
+      "output_value_counts": {
+        "0.0": 12784
+      }
+    },
+    "8": {
+      "artifact": "/tmp/diarizen_trt_synthetic_refs_16s/ort_fp32_synthetic_16s_bs8.npz",
+      "output_shape": [
+        8,
+        799,
+        4
+      ],
+      "output_value_counts": {
+        "0.0": 25568
+      }
+    },
+    "16": {
+      "artifact": "/tmp/diarizen_trt_synthetic_refs_16s/ort_fp32_synthetic_16s_bs16.npz",
+      "output_shape": [
+        16,
+        799,
+        4
+      ],
+      "output_value_counts": {
+        "0.0": 51136
+      }
+    },
+    "32": {
+      "artifact": "/tmp/diarizen_trt_synthetic_refs_16s/ort_fp32_synthetic_16s_bs32.npz",
+      "output_shape": [
+        32,
+        799,
+        4
+      ],
+      "output_value_counts": {
+        "0.0": 102272
+      }
+    }
+  }
+}

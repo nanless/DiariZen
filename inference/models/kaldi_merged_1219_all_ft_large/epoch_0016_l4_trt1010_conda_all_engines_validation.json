@@ -1,0 +1,463 @@
+{
+  "environment": {
+    "conda_env": "diarizen-trt1010",
+    "conda_prefix": "/root/miniforge3/envs/diarizen-trt1010",
+    "python": "3.10.18",
+    "tensorrt": "10.10.0.31",
+    "torch": "2.3.1+cu121",
+    "torch_cuda": "12.1",
+    "gpu": "NVIDIA L4"
+  },
+  "scope": "all fixed-10s TensorRT plans; adversarial synthetic only",
+  "results": [
+    {
+      "precision": "fp16",
+      "batch_size": 1,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010/segmentation_10s_bs1_fp16.plan",
+      "engine_bytes": 163620996,
+      "output_shape": [
+        1,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 100.0,
+      "frame_exact_match_pct": 100.0,
+      "mismatched_cells": 0,
+      "mismatched_frames": 0,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "fp16",
+      "batch_size": 4,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010/segmentation_10s_bs4_fp16.plan",
+      "engine_bytes": 184391564,
+      "output_shape": [
+        4,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 99.937375,
+      "frame_exact_match_pct": 99.749499,
+      "mismatched_cells": 5,
+      "mismatched_frames": 5,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "fp16",
+      "batch_size": 8,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010/segmentation_10s_bs8_fp16.plan",
+      "engine_bytes": 210382860,
+      "output_shape": [
+        8,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 99.9499,
+      "frame_exact_match_pct": 99.799599,
+      "mismatched_cells": 8,
+      "mismatched_frames": 8,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "fp16",
+      "batch_size": 32,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010/segmentation_10s_bs32_fp16.plan",
+      "engine_bytes": 385375060,
+      "output_shape": [
+        32,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 99.88884,
+      "frame_exact_match_pct": 99.555361,
+      "mismatched_cells": 71,
+      "mismatched_frames": 71,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "fp32_tf32",
+      "batch_size": 1,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs1_fp32_tf32.plan",
+      "engine_bytes": 294533060,
+      "output_shape": [
+        1,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 100.0,
+      "frame_exact_match_pct": 100.0,
+      "mismatched_cells": 0,
+      "mismatched_frames": 0,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "fp32_tf32",
+      "batch_size": 4,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs4_fp32_tf32.plan",
+      "engine_bytes": 291963724,
+      "output_shape": [
+        4,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 99.937375,
+      "frame_exact_match_pct": 99.749499,
+      "mismatched_cells": 5,
+      "mismatched_frames": 5,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "fp32_tf32",
+      "batch_size": 8,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs8_fp32_tf32.plan",
+      "engine_bytes": 293001612,
+      "output_shape": [
+        8,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 99.9499,
+      "frame_exact_match_pct": 99.799599,
+      "mismatched_cells": 8,
+      "mismatched_frames": 8,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "fp32_tf32",
+      "batch_size": 32,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs32_fp32_tf32.plan",
+      "engine_bytes": 296828004,
+      "output_shape": [
+        32,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 99.893537,
+      "frame_exact_match_pct": 99.574148,
+      "mismatched_cells": 68,
+      "mismatched_frames": 68,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "fp32",
+      "batch_size": 1,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs1_fp32.plan",
+      "engine_bytes": 290563300,
+      "output_shape": [
+        1,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 100.0,
+      "frame_exact_match_pct": 100.0,
+      "mismatched_cells": 0,
+      "mismatched_frames": 0,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "fp32",
+      "batch_size": 4,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs4_fp32.plan",
+      "engine_bytes": 292632428,
+      "output_shape": [
+        4,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 99.937375,
+      "frame_exact_match_pct": 99.749499,
+      "mismatched_cells": 5,
+      "mismatched_frames": 5,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "fp32",
+      "batch_size": 8,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs8_fp32.plan",
+      "engine_bytes": 292281620,
+      "output_shape": [
+        8,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 99.956162,
+      "frame_exact_match_pct": 99.824649,
+      "mismatched_cells": 7,
+      "mismatched_frames": 7,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "fp32",
+      "batch_size": 32,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs32_fp32.plan",
+      "engine_bytes": 295394508,
+      "output_shape": [
+        32,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 99.893537,
+      "frame_exact_match_pct": 99.574148,
+      "mismatched_cells": 68,
+      "mismatched_frames": 68,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "bf16",
+      "batch_size": 1,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs1_bf16.plan",
+      "engine_bytes": 187304892,
+      "output_shape": [
+        1,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 100.0,
+      "frame_exact_match_pct": 100.0,
+      "mismatched_cells": 0,
+      "mismatched_frames": 0,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "bf16",
+      "batch_size": 4,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs4_bf16.plan",
+      "engine_bytes": 209521220,
+      "output_shape": [
+        4,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 99.937375,
+      "frame_exact_match_pct": 99.749499,
+      "mismatched_cells": 5,
+      "mismatched_frames": 5,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "bf16",
+      "batch_size": 8,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs8_bf16.plan",
+      "engine_bytes": 238112276,
+      "output_shape": [
+        8,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 99.956162,
+      "frame_exact_match_pct": 99.824649,
+      "mismatched_cells": 7,
+      "mismatched_frames": 7,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "bf16",
+      "batch_size": 32,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs32_bf16.plan",
+      "engine_bytes": 418920708,
+      "output_shape": [
+        32,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 99.75263,
+      "frame_exact_match_pct": 99.010521,
+      "mismatched_cells": 158,
+      "mismatched_frames": 158,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "fp8",
+      "batch_size": 1,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs1_fp8.plan",
+      "engine_bytes": 95346060,
+      "output_shape": [
+        1,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 99.849699,
+      "frame_exact_match_pct": 99.398798,
+      "mismatched_cells": 3,
+      "mismatched_frames": 3,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "fp8",
+      "batch_size": 4,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs4_fp8.plan",
+      "engine_bytes": 119309572,
+      "output_shape": [
+        4,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 99.824649,
+      "frame_exact_match_pct": 99.298597,
+      "mismatched_cells": 14,
+      "mismatched_frames": 14,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "fp8",
+      "batch_size": 8,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs8_fp8.plan",
+      "engine_bytes": 149722652,
+      "output_shape": [
+        8,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 99.837174,
+      "frame_exact_match_pct": 99.348697,
+      "mismatched_cells": 26,
+      "mismatched_frames": 26,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "fp8",
+      "batch_size": 32,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs32_fp8.plan",
+      "engine_bytes": 331562508,
+      "output_shape": [
+        32,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 99.747933,
+      "frame_exact_match_pct": 98.991733,
+      "mismatched_cells": 161,
+      "mismatched_frames": 161,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "int8",
+      "batch_size": 1,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs1_int8.plan",
+      "engine_bytes": 103144116,
+      "output_shape": [
+        1,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 52.55511,
+      "frame_exact_match_pct": 0.200401,
+      "mismatched_cells": 947,
+      "mismatched_frames": 498,
+      "repeat_exact_match_pct": 99.799599
+    },
+    {
+      "precision": "int8",
+      "batch_size": 4,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs4_int8.plan",
+      "engine_bytes": 126081116,
+      "output_shape": [
+        4,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 52.642786,
+      "frame_exact_match_pct": 0.501002,
+      "mismatched_cells": 3781,
+      "mismatched_frames": 1986,
+      "repeat_exact_match_pct": 99.799599
+    },
+    {
+      "precision": "int8",
+      "batch_size": 8,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs8_int8.plan",
+      "engine_bytes": 155175660,
+      "output_shape": [
+        8,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 52.642786,
+      "frame_exact_match_pct": 0.400802,
+      "mismatched_cells": 7562,
+      "mismatched_frames": 3976,
+      "repeat_exact_match_pct": 99.830912
+    },
+    {
+      "precision": "int8",
+      "batch_size": 32,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs32_int8.plan",
+      "engine_bytes": 326038708,
+      "output_shape": [
+        32,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 52.650614,
+      "frame_exact_match_pct": 0.394539,
+      "mismatched_cells": 30243,
+      "mismatched_frames": 15905,
+      "repeat_exact_match_pct": 99.898234
+    },
+    {
+      "precision": "int4",
+      "batch_size": 1,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs1_int4.plan",
+      "engine_bytes": 149587932,
+      "output_shape": [
+        1,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 98.997996,
+      "frame_exact_match_pct": 96.793587,
+      "mismatched_cells": 20,
+      "mismatched_frames": 16,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "int4",
+      "batch_size": 4,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs4_int4.plan",
+      "engine_bytes": 149197260,
+      "output_shape": [
+        4,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 98.997996,
+      "frame_exact_match_pct": 96.793587,
+      "mismatched_cells": 80,
+      "mismatched_frames": 64,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "int4",
+      "batch_size": 8,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs8_int4.plan",
+      "engine_bytes": 151015740,
+      "output_shape": [
+        8,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 98.997996,
+      "frame_exact_match_pct": 96.793587,
+      "mismatched_cells": 160,
+      "mismatched_frames": 128,
+      "repeat_exact_match_pct": 100.0
+    },
+    {
+      "precision": "int4",
+      "batch_size": 32,
+      "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/segmentation_10s_bs32_int4.plan",
+      "engine_bytes": 151171460,
+      "output_shape": [
+        32,
+        499,
+        4
+      ],
+      "cell_exact_match_pct": 98.997996,
+      "frame_exact_match_pct": 96.793587,
+      "mismatched_cells": 640,
+      "mismatched_frames": 512,
+      "repeat_exact_match_pct": 100.0
+    }
+  ],
+  "engine_count": 28
+}

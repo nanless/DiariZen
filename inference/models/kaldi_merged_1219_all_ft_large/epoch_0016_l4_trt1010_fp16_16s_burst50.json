@@ -1,0 +1,39 @@
+{
+  "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s/segmentation_16s_bs1_fp16.plan",
+  "input_seconds": 16.0,
+  "requests_per_burst": 50,
+  "results": [
+    {
+      "streams": 1,
+      "burst_mean_ms": 546.61,
+      "burst_p95_ms": 548.81,
+      "request_completion_p50_mean_ms": 278.639,
+      "request_completion_p95_mean_ms": 519.827,
+      "requests_per_second": 91.47
+    },
+    {
+      "streams": 2,
+      "burst_mean_ms": 534.77,
+      "burst_p95_ms": 537.643,
+      "request_completion_p50_mean_ms": 278.626,
+      "request_completion_p95_mean_ms": 514.271,
+      "requests_per_second": 93.5
+    },
+    {
+      "streams": 4,
+      "burst_mean_ms": 555.05,
+      "burst_p95_ms": 557.857,
+      "request_completion_p50_mean_ms": 310.746,
+      "request_completion_p95_mean_ms": 535.477,
+      "requests_per_second": 90.08
+    },
+    {
+      "streams": 8,
+      "burst_mean_ms": 571.648,
+      "burst_p95_ms": 574.098,
+      "request_completion_p50_mean_ms": 330.803,
+      "request_completion_p95_mean_ms": 554.939,
+      "requests_per_second": 87.47
+    }
+  ]
+}
