@@ -1,0 +1,281 @@
+{
+  "scope": "fixed 16-second synthetic input, batch=1, 50-request burst",
+  "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s/segmentation_16s_bs1_fp16.plan",
+  "warmup_bursts": 3,
+  "repeats": 30,
+  "results": [
+    {
+      "mode": "enqueue_device",
+      "streams": 1,
+      "requests": 50,
+      "burst_mean_ms": 563.084766,
+      "burst_p50_ms": 563.256531,
+      "burst_p95_ms": 570.318439,
+      "request_completion_p50_mean_ms": 287.321958,
+      "request_completion_p95_mean_ms": 535.515319,
+      "requests_per_second": 88.797,
+      "graph_node_counts": [
+        394
+      ],
+      "graph_parity": [
+        {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        }
+      ],
+      "device_memory_used_mib_all_groups": 1037.0
+    },
+    {
+      "mode": "cudagraph_device",
+      "streams": 1,
+      "requests": 50,
+      "burst_mean_ms": 548.028174,
+      "burst_p50_ms": 549.45108,
+      "burst_p95_ms": 553.684689,
+      "request_completion_p50_mean_ms": 279.447966,
+      "request_completion_p95_mean_ms": 521.176021,
+      "requests_per_second": 91.236,
+      "graph_node_counts": [
+        394
+      ],
+      "graph_parity": [
+        {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        }
+      ],
+      "device_memory_used_mib_all_groups": 1037.0
+    },
+    {
+      "mode": "enqueue_pinned_e2e",
+      "streams": 1,
+      "requests": 50,
+      "burst_mean_ms": 565.187826,
+      "burst_p50_ms": 565.781006,
+      "burst_p95_ms": 573.123947,
+      "request_completion_p50_mean_ms": 287.697723,
+      "request_completion_p95_mean_ms": 537.474832,
+      "requests_per_second": 88.466,
+      "graph_node_counts": [
+        394
+      ],
+      "graph_parity": [
+        {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        }
+      ],
+      "device_memory_used_mib_all_groups": 1037.0
+    },
+    {
+      "mode": "cudagraph_pinned_e2e",
+      "streams": 1,
+      "requests": 50,
+      "burst_mean_ms": 550.496181,
+      "burst_p50_ms": 551.680176,
+      "burst_p95_ms": 556.303061,
+      "request_completion_p50_mean_ms": 281.270231,
+      "request_completion_p95_mean_ms": 523.613617,
+      "requests_per_second": 90.827,
+      "graph_node_counts": [
+        394
+      ],
+      "graph_parity": [
+        {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        }
+      ],
+      "device_memory_used_mib_all_groups": 1037.0
+    },
+    {
+      "mode": "enqueue_device",
+      "streams": 2,
+      "requests": 50,
+      "burst_mean_ms": 547.339878,
+      "burst_p50_ms": 547.249023,
+      "burst_p95_ms": 554.753049,
+      "request_completion_p50_mean_ms": 284.748745,
+      "request_completion_p95_mean_ms": 526.439965,
+      "requests_per_second": 91.351,
+      "graph_node_counts": [
+        394,
+        394
+      ],
+      "graph_parity": [
+        {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        },
+        {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        }
+      ],
+      "device_memory_used_mib_all_groups": 1037.0
+    },
+    {
+      "mode": "cudagraph_device",
+      "streams": 2,
+      "requests": 50,
+      "burst_mean_ms": 548.864347,
+      "burst_p50_ms": 548.71167,
+      "burst_p95_ms": 555.636768,
+      "request_completion_p50_mean_ms": 286.13903,
+      "request_completion_p95_mean_ms": 527.261707,
+      "requests_per_second": 91.097,
+      "graph_node_counts": [
+        394,
+        394
+      ],
+      "graph_parity": [
+        {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        },
+        {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        }
+      ],
+      "device_memory_used_mib_all_groups": 1037.0
+    },
+    {
+      "mode": "enqueue_pinned_e2e",
+      "streams": 2,
+      "requests": 50,
+      "burst_mean_ms": 548.029594,
+      "burst_p50_ms": 547.857117,
+      "burst_p95_ms": 555.471411,
+      "request_completion_p50_mean_ms": 284.74506,
+      "request_completion_p95_mean_ms": 526.478795,
+      "requests_per_second": 91.236,
+      "graph_node_counts": [
+        394,
+        394
+      ],
+      "graph_parity": [
+        {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        },
+        {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        }
+      ],
+      "device_memory_used_mib_all_groups": 1037.0
+    },
+    {
+      "mode": "cudagraph_pinned_e2e",
+      "streams": 2,
+      "requests": 50,
+      "burst_mean_ms": 549.273147,
+      "burst_p50_ms": 549.010956,
+      "burst_p95_ms": 556.04397,
+      "request_completion_p50_mean_ms": 285.723215,
+      "request_completion_p95_mean_ms": 527.322914,
+      "requests_per_second": 91.029,
+      "graph_node_counts": [
+        394,
+        394
+      ],
+      "graph_parity": [
+        {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        },
+        {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        }
+      ],
+      "device_memory_used_mib_all_groups": 1037.0
+    }
+  ],
+  "method": "all workers/graphs allocated once; combinations measured in forward/reverse alternating order to reduce thermal and clock-order bias"
+}

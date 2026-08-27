@@ -1,0 +1,573 @@
+{
+  "scope": "fixed 16-second synthetic input only",
+  "input_shape": [
+    1,
+    1,
+    256000
+  ],
+  "precision": "TensorRT FP16 mixed precision",
+  "warmup": 30,
+  "repeats": 200,
+  "baseline": {
+    "name": "opt3_existing",
+    "path": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s/segmentation_16s_bs1_fp16.plan",
+    "build": {
+      "optimization_level": 3,
+      "reused": true
+    },
+    "benchmark": {
+      "engine_bytes": 171371492,
+      "engine_num_aux_streams": 1,
+      "engine_device_memory_bytes": 210734080,
+      "enqueue_device": {
+        "gpu": {
+          "samples": 200,
+          "mean_ms": 10.967657,
+          "p50_ms": 10.924304,
+          "p95_ms": 11.254757,
+          "min_ms": 10.777952,
+          "max_ms": 11.387744,
+          "stdev_ms": 0.147283,
+          "requests_per_second": 91.177,
+          "audio_seconds_per_second": 1458.835
+        },
+        "wall": {
+          "samples": 200,
+          "mean_ms": 10.984749,
+          "p50_ms": 10.945336,
+          "p95_ms": 11.269732,
+          "min_ms": 10.790602,
+          "max_ms": 11.402788,
+          "stdev_ms": 0.146291,
+          "requests_per_second": 91.035,
+          "audio_seconds_per_second": 1456.565
+        },
+        "host_api_us": {
+          "samples": 200,
+          "mean_us": 1396.696295,
+          "p50_us": 1377.755,
+          "p95_us": 1510.0172
+        }
+      },
+      "cuda_graph_node_count": 394,
+      "cuda_graph_parity": {
+        "exact": true,
+        "max_abs_diff": 0.0,
+        "mean_abs_diff": 0.0,
+        "output_shape": [
+          1,
+          799,
+          4
+        ],
+        "output_dtype": "torch.float32"
+      },
+      "cudagraph_device": {
+        "gpu": {
+          "samples": 200,
+          "mean_ms": 10.703664,
+          "p50_ms": 10.665872,
+          "p95_ms": 10.993246,
+          "min_ms": 10.424576,
+          "max_ms": 11.013504,
+          "stdev_ms": 0.175934,
+          "requests_per_second": 93.426,
+          "audio_seconds_per_second": 1494.815
+        },
+        "wall": {
+          "samples": 200,
+          "mean_ms": 10.716311,
+          "p50_ms": 10.676517,
+          "p95_ms": 11.007103,
+          "min_ms": 10.435869,
+          "max_ms": 11.030391,
+          "stdev_ms": 0.17587,
+          "requests_per_second": 93.316,
+          "audio_seconds_per_second": 1493.051
+        },
+        "host_api_us": {
+          "samples": 200,
+          "mean_us": 6.30829,
+          "p50_us": 5.079,
+          "p95_us": 13.4567
+        }
+      }
+    }
+  },
+  "candidates": {
+    "opt4_ws8_auxauto": {
+      "path": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s_builder_search/segmentation_16s_bs1_fp16_opt4_ws8_auxauto.plan",
+      "build": {
+        "optimization_level": 4,
+        "workspace_gb": 8,
+        "requested_max_aux_streams": null,
+        "wrapper_wall_seconds": 242.454,
+        "build_seconds": 232.734,
+        "reused": false
+      },
+      "benchmark": {
+        "engine_bytes": 170739348,
+        "engine_num_aux_streams": 1,
+        "engine_device_memory_bytes": 210734080,
+        "enqueue_device": {
+          "gpu": {
+            "samples": 200,
+            "mean_ms": 11.056131,
+            "p50_ms": 10.974368,
+            "p95_ms": 11.361672,
+            "min_ms": 10.836096,
+            "max_ms": 11.4872,
+            "stdev_ms": 0.16929,
+            "requests_per_second": 90.448,
+            "audio_seconds_per_second": 1447.161
+          },
+          "wall": {
+            "samples": 200,
+            "mean_ms": 11.071755,
+            "p50_ms": 10.989814,
+            "p95_ms": 11.375979,
+            "min_ms": 10.849732,
+            "max_ms": 11.510165,
+            "stdev_ms": 0.169212,
+            "requests_per_second": 90.32,
+            "audio_seconds_per_second": 1445.119
+          },
+          "host_api_us": {
+            "samples": 200,
+            "mean_us": 1589.46611,
+            "p50_us": 1576.4575,
+            "p95_us": 1655.79815
+          }
+        },
+        "cuda_graph_node_count": 393,
+        "cuda_graph_parity": {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        },
+        "cudagraph_device": {
+          "gpu": {
+            "samples": 200,
+            "mean_ms": 10.819358,
+            "p50_ms": 10.842576,
+            "p95_ms": 10.969755,
+            "min_ms": 10.531296,
+            "max_ms": 11.133984,
+            "stdev_ms": 0.119804,
+            "requests_per_second": 92.427,
+            "audio_seconds_per_second": 1478.831
+          },
+          "wall": {
+            "samples": 200,
+            "mean_ms": 10.831382,
+            "p50_ms": 10.853741,
+            "p95_ms": 10.98244,
+            "min_ms": 10.541847,
+            "max_ms": 11.165544,
+            "stdev_ms": 0.119463,
+            "requests_per_second": 92.324,
+            "audio_seconds_per_second": 1477.189
+          },
+          "host_api_us": {
+            "samples": 200,
+            "mean_us": 5.38541,
+            "p50_us": 4.3705,
+            "p95_us": 10.97695
+          }
+        }
+      },
+      "decision_vs_opt3_cudagraph_gpu": {
+        "accepted": false,
+        "minimum_improvement_pct": 1.0,
+        "mean_speedup": 0.9893067592365462,
+        "p95_speedup": 1.00214143342308,
+        "reason": "mean and p95 improvements are below the acceptance threshold"
+      }
+    },
+    "opt5_ws8_auxauto": {
+      "path": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s_builder_search/segmentation_16s_bs1_fp16_opt5_ws8_auxauto.plan",
+      "build": {
+        "optimization_level": 5,
+        "workspace_gb": 8,
+        "requested_max_aux_streams": null,
+        "wrapper_wall_seconds": 652.392,
+        "build_seconds": 645.117,
+        "reused": false
+      },
+      "benchmark": {
+        "engine_bytes": 170739348,
+        "engine_num_aux_streams": 1,
+        "engine_device_memory_bytes": 210734080,
+        "enqueue_device": {
+          "gpu": {
+            "samples": 200,
+            "mean_ms": 11.18106,
+            "p50_ms": 11.14584,
+            "p95_ms": 11.487856,
+            "min_ms": 10.874976,
+            "max_ms": 11.565088,
+            "stdev_ms": 0.182411,
+            "requests_per_second": 89.437,
+            "audio_seconds_per_second": 1430.991
+          },
+          "wall": {
+            "samples": 200,
+            "mean_ms": 11.197716,
+            "p50_ms": 11.162526,
+            "p95_ms": 11.504363,
+            "min_ms": 10.888872,
+            "max_ms": 11.580456,
+            "stdev_ms": 0.182174,
+            "requests_per_second": 89.304,
+            "audio_seconds_per_second": 1428.863
+          },
+          "host_api_us": {
+            "samples": 200,
+            "mean_us": 1730.801315,
+            "p50_us": 1713.5605,
+            "p95_us": 1813.30135
+          }
+        },
+        "cuda_graph_node_count": 393,
+        "cuda_graph_parity": {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        },
+        "cudagraph_device": {
+          "gpu": {
+            "samples": 200,
+            "mean_ms": 10.923397,
+            "p50_ms": 10.948864,
+            "p95_ms": 11.055816,
+            "min_ms": 10.691328,
+            "max_ms": 11.128608,
+            "stdev_ms": 0.084219,
+            "requests_per_second": 91.547,
+            "audio_seconds_per_second": 1464.746
+          },
+          "wall": {
+            "samples": 200,
+            "mean_ms": 10.935999,
+            "p50_ms": 10.960082,
+            "p95_ms": 11.071269,
+            "min_ms": 10.702485,
+            "max_ms": 11.15584,
+            "stdev_ms": 0.084426,
+            "requests_per_second": 91.441,
+            "audio_seconds_per_second": 1463.058
+          },
+          "host_api_us": {
+            "samples": 200,
+            "mean_us": 5.85563,
+            "p50_us": 4.715,
+            "p95_us": 11.8824
+          }
+        }
+      },
+      "decision_vs_opt3_cudagraph_gpu": {
+        "accepted": false,
+        "minimum_improvement_pct": 1.0,
+        "mean_speedup": 0.979884188041504,
+        "p95_speedup": 0.9943405353345243,
+        "reason": "mean and p95 improvements are below the acceptance threshold"
+      }
+    },
+    "opt5_ws8_aux0": {
+      "path": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s_builder_search/segmentation_16s_bs1_fp16_opt5_ws8_aux0.plan",
+      "build": {
+        "optimization_level": 5,
+        "workspace_gb": 8,
+        "requested_max_aux_streams": 0,
+        "wrapper_wall_seconds": 73.542,
+        "build_seconds": 65.568,
+        "reused": false
+      },
+      "benchmark": {
+        "engine_bytes": 170730572,
+        "engine_num_aux_streams": 0,
+        "engine_device_memory_bytes": 211961344,
+        "enqueue_device": {
+          "gpu": {
+            "samples": 200,
+            "mean_ms": 11.081691,
+            "p50_ms": 11.059856,
+            "p95_ms": 11.363045,
+            "min_ms": 10.92544,
+            "max_ms": 11.49424,
+            "stdev_ms": 0.123741,
+            "requests_per_second": 90.239,
+            "audio_seconds_per_second": 1443.823
+          },
+          "wall": {
+            "samples": 200,
+            "mean_ms": 11.095545,
+            "p50_ms": 11.073194,
+            "p95_ms": 11.375607,
+            "min_ms": 10.937351,
+            "max_ms": 11.512366,
+            "stdev_ms": 0.123914,
+            "requests_per_second": 90.126,
+            "audio_seconds_per_second": 1442.02
+          },
+          "host_api_us": {
+            "samples": 200,
+            "mean_us": 1655.6997,
+            "p50_us": 1649.9665,
+            "p95_us": 1705.4889
+          }
+        },
+        "cuda_graph_node_count": 387,
+        "cuda_graph_parity": {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        },
+        "cudagraph_device": {
+          "gpu": {
+            "samples": 200,
+            "mean_ms": 10.821506,
+            "p50_ms": 10.82888,
+            "p95_ms": 10.955271,
+            "min_ms": 10.601536,
+            "max_ms": 10.97136,
+            "stdev_ms": 0.083081,
+            "requests_per_second": 92.409,
+            "audio_seconds_per_second": 1478.537
+          },
+          "wall": {
+            "samples": 200,
+            "mean_ms": 10.834008,
+            "p50_ms": 10.841007,
+            "p95_ms": 10.965513,
+            "min_ms": 10.612185,
+            "max_ms": 11.006354,
+            "stdev_ms": 0.083418,
+            "requests_per_second": 92.302,
+            "audio_seconds_per_second": 1476.831
+          },
+          "host_api_us": {
+            "samples": 200,
+            "mean_us": 5.995825,
+            "p50_us": 4.3255,
+            "p95_us": 15.58075
+          }
+        }
+      },
+      "decision_vs_opt3_cudagraph_gpu": {
+        "accepted": false,
+        "minimum_improvement_pct": 1.0,
+        "mean_speedup": 0.9891103881474538,
+        "p95_speedup": 1.0034663679246272,
+        "reason": "mean and p95 improvements are below the acceptance threshold"
+      }
+    },
+    "opt5_ws8_aux2": {
+      "path": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s_builder_search/segmentation_16s_bs1_fp16_opt5_ws8_aux2.plan",
+      "build": {
+        "optimization_level": 5,
+        "workspace_gb": 8,
+        "requested_max_aux_streams": 2,
+        "wrapper_wall_seconds": 77.316,
+        "build_seconds": 69.251,
+        "reused": false
+      },
+      "benchmark": {
+        "engine_bytes": 168313580,
+        "engine_num_aux_streams": 0,
+        "engine_device_memory_bytes": 166860288,
+        "enqueue_device": {
+          "gpu": {
+            "samples": 200,
+            "mean_ms": 11.109933,
+            "p50_ms": 11.032768,
+            "p95_ms": 11.450979,
+            "min_ms": 10.869952,
+            "max_ms": 11.563712,
+            "stdev_ms": 0.181722,
+            "requests_per_second": 90.01,
+            "audio_seconds_per_second": 1440.153
+          },
+          "wall": {
+            "samples": 200,
+            "mean_ms": 11.125136,
+            "p50_ms": 11.048974,
+            "p95_ms": 11.469183,
+            "min_ms": 10.885208,
+            "max_ms": 11.581977,
+            "stdev_ms": 0.182041,
+            "requests_per_second": 89.887,
+            "audio_seconds_per_second": 1438.185
+          },
+          "host_api_us": {
+            "samples": 200,
+            "mean_us": 1524.22653,
+            "p50_us": 1506.7195,
+            "p95_us": 1591.75645
+          }
+        },
+        "cuda_graph_node_count": 381,
+        "cuda_graph_parity": {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        },
+        "cudagraph_device": {
+          "gpu": {
+            "samples": 200,
+            "mean_ms": 10.857749,
+            "p50_ms": 10.878064,
+            "p95_ms": 11.001703,
+            "min_ms": 10.645888,
+            "max_ms": 11.09552,
+            "stdev_ms": 0.098724,
+            "requests_per_second": 92.1,
+            "audio_seconds_per_second": 1473.602
+          },
+          "wall": {
+            "samples": 200,
+            "mean_ms": 10.871948,
+            "p50_ms": 10.890781,
+            "p95_ms": 11.018697,
+            "min_ms": 10.658452,
+            "max_ms": 11.119552,
+            "stdev_ms": 0.098681,
+            "requests_per_second": 91.98,
+            "audio_seconds_per_second": 1471.677
+          },
+          "host_api_us": {
+            "samples": 200,
+            "mean_us": 7.866215,
+            "p50_us": 6.315,
+            "p95_us": 18.9732
+          }
+        }
+      },
+      "decision_vs_opt3_cudagraph_gpu": {
+        "accepted": false,
+        "minimum_improvement_pct": 1.0,
+        "mean_speedup": 0.9858087528087083,
+        "p95_speedup": 0.9992313008267902,
+        "reason": "mean and p95 improvements are below the acceptance threshold"
+      }
+    },
+    "opt5_ws16_auxauto": {
+      "path": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s_builder_search/segmentation_16s_bs1_fp16_opt5_ws16_auxauto.plan",
+      "build": {
+        "optimization_level": 5,
+        "workspace_gb": 16,
+        "requested_max_aux_streams": null,
+        "wrapper_wall_seconds": 74.448,
+        "build_seconds": 66.077,
+        "reused": false
+      },
+      "benchmark": {
+        "engine_bytes": 168313580,
+        "engine_num_aux_streams": 0,
+        "engine_device_memory_bytes": 166860288,
+        "enqueue_device": {
+          "gpu": {
+            "samples": 200,
+            "mean_ms": 11.059778,
+            "p50_ms": 11.042704,
+            "p95_ms": 11.23322,
+            "min_ms": 10.907392,
+            "max_ms": 11.386464,
+            "stdev_ms": 0.094905,
+            "requests_per_second": 90.418,
+            "audio_seconds_per_second": 1446.684
+          },
+          "wall": {
+            "samples": 200,
+            "mean_ms": 11.074244,
+            "p50_ms": 11.056466,
+            "p95_ms": 11.250074,
+            "min_ms": 10.920494,
+            "max_ms": 11.400242,
+            "stdev_ms": 0.095368,
+            "requests_per_second": 90.3,
+            "audio_seconds_per_second": 1444.794
+          },
+          "host_api_us": {
+            "samples": 200,
+            "mean_us": 1512.554665,
+            "p50_us": 1501.388,
+            "p95_us": 1583.09945
+          }
+        },
+        "cuda_graph_node_count": 381,
+        "cuda_graph_parity": {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        },
+        "cudagraph_device": {
+          "gpu": {
+            "samples": 200,
+            "mean_ms": 10.790433,
+            "p50_ms": 10.789504,
+            "p95_ms": 10.933888,
+            "min_ms": 10.536032,
+            "max_ms": 11.023936,
+            "stdev_ms": 0.086284,
+            "requests_per_second": 92.675,
+            "audio_seconds_per_second": 1482.795
+          },
+          "wall": {
+            "samples": 200,
+            "mean_ms": 10.804236,
+            "p50_ms": 10.804505,
+            "p95_ms": 10.946822,
+            "min_ms": 10.552759,
+            "max_ms": 11.050748,
+            "stdev_ms": 0.086595,
+            "requests_per_second": 92.556,
+            "audio_seconds_per_second": 1480.901
+          },
+          "host_api_us": {
+            "samples": 200,
+            "mean_us": 6.553675,
+            "p50_us": 4.7885,
+            "p95_us": 19.0622
+          }
+        }
+      },
+      "decision_vs_opt3_cudagraph_gpu": {
+        "accepted": false,
+        "minimum_improvement_pct": 1.0,
+        "mean_speedup": 0.9919587100906886,
+        "p95_speedup": 1.005428809953056,
+        "reason": "mean and p95 improvements are below the acceptance threshold"
+      }
+    }
+  }
+}

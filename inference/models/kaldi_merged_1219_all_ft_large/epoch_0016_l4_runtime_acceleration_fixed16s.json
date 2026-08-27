@@ -1,0 +1,191 @@
+{
+  "scope": "fixed 16-second synthetic input only",
+  "input_shape": [
+    1,
+    1,
+    256000
+  ],
+  "batch_size": 1,
+  "warmup": 30,
+  "repeats": 200,
+  "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s/segmentation_16s_bs1_fp16.plan",
+  "engine_bytes": 171371492,
+  "environment": {
+    "gpu": "NVIDIA L4",
+    "compute_capability": [
+      8,
+      9
+    ],
+    "torch": "2.3.1+cu121",
+    "torch_cuda": "12.1",
+    "tensorrt": "10.10.0.31"
+  },
+  "results": {
+    "enqueue_device": {
+      "gpu": {
+        "samples": 200,
+        "mean_ms": 10.972698,
+        "p50_ms": 10.919744,
+        "p95_ms": 11.250002,
+        "min_ms": 10.770656,
+        "max_ms": 11.407168,
+        "stdev_ms": 0.141266,
+        "requests_per_second": 91.135,
+        "audio_seconds_per_second": 1458.165
+      },
+      "wall": {
+        "samples": 200,
+        "mean_ms": 10.992298,
+        "p50_ms": 10.939906,
+        "p95_ms": 11.271675,
+        "min_ms": 10.78564,
+        "max_ms": 11.426577,
+        "stdev_ms": 0.141821,
+        "requests_per_second": 90.973,
+        "audio_seconds_per_second": 1455.565
+      },
+      "host_api_us": {
+        "samples": 200,
+        "mean_us": 1415.102735,
+        "p50_us": 1395.156,
+        "p95_us": 1556.1157
+      }
+    },
+    "enqueue_pinned_e2e": {
+      "gpu": {
+        "samples": 200,
+        "mean_ms": 11.052794,
+        "p50_ms": 11.052304,
+        "p95_ms": 11.178476,
+        "min_ms": 10.89616,
+        "max_ms": 11.241664,
+        "stdev_ms": 0.071002,
+        "requests_per_second": 90.475,
+        "audio_seconds_per_second": 1447.598
+      },
+      "wall": {
+        "samples": 200,
+        "mean_ms": 11.071419,
+        "p50_ms": 11.069018,
+        "p95_ms": 11.198732,
+        "min_ms": 10.909332,
+        "max_ms": 11.259207,
+        "stdev_ms": 0.073347,
+        "requests_per_second": 90.323,
+        "audio_seconds_per_second": 1445.163
+      },
+      "host_api_us": {
+        "samples": 200,
+        "mean_us": 1580.1979,
+        "p50_us": 1544.4925,
+        "p95_us": 1767.6687
+      }
+    },
+    "cudagraph_device": {
+      "gpu": {
+        "samples": 200,
+        "mean_ms": 10.7253,
+        "p50_ms": 10.71616,
+        "p95_ms": 10.995482,
+        "min_ms": 10.50992,
+        "max_ms": 11.020288,
+        "stdev_ms": 0.161162,
+        "requests_per_second": 93.237,
+        "audio_seconds_per_second": 1491.8
+      },
+      "wall": {
+        "samples": 200,
+        "mean_ms": 10.74343,
+        "p50_ms": 10.734883,
+        "p95_ms": 11.010873,
+        "min_ms": 10.525877,
+        "max_ms": 11.03906,
+        "stdev_ms": 0.159837,
+        "requests_per_second": 93.08,
+        "audio_seconds_per_second": 1489.282
+      },
+      "host_api_us": {
+        "samples": 200,
+        "mean_us": 11.038785,
+        "p50_us": 11.099,
+        "p95_us": 17.57715
+      }
+    },
+    "cudagraph_pinned_e2e": {
+      "gpu": {
+        "samples": 200,
+        "mean_ms": 10.798657,
+        "p50_ms": 10.81272,
+        "p95_ms": 10.95009,
+        "min_ms": 10.4376,
+        "max_ms": 11.075456,
+        "stdev_ms": 0.112126,
+        "requests_per_second": 92.604,
+        "audio_seconds_per_second": 1481.666
+      },
+      "wall": {
+        "samples": 200,
+        "mean_ms": 10.818208,
+        "p50_ms": 10.830286,
+        "p95_ms": 10.971532,
+        "min_ms": 10.459653,
+        "max_ms": 11.091251,
+        "stdev_ms": 0.11234,
+        "requests_per_second": 92.437,
+        "audio_seconds_per_second": 1478.988
+      },
+      "host_api_us": {
+        "samples": 200,
+        "mean_us": 103.604295,
+        "p50_us": 100.8025,
+        "p95_us": 150.8648
+      }
+    }
+  },
+  "cuda_graph_capture": {
+    "success": true,
+    "implementation": "CUDA Runtime stream capture",
+    "node_count": 394
+  },
+  "cuda_graph_parity": {
+    "exact": true,
+    "max_abs_diff": 0.0,
+    "mean_abs_diff": 0.0,
+    "output_shape": [
+      1,
+      799,
+      4
+    ],
+    "output_dtype": "torch.float32"
+  },
+  "decisions": {
+    "cudagraph_device_gpu": {
+      "accepted": true,
+      "minimum_improvement_pct": 1.0,
+      "mean_speedup": 1.0230667673631506,
+      "p95_speedup": 1.023147689205439,
+      "reason": "mean and p95 improve by at least 1%"
+    },
+    "cudagraph_pinned_e2e_gpu": {
+      "accepted": true,
+      "minimum_improvement_pct": 1.0,
+      "mean_speedup": 1.0235341302163778,
+      "p95_speedup": 1.020856997522395,
+      "reason": "mean and p95 improve by at least 1%"
+    },
+    "cudagraph_device_wall": {
+      "accepted": true,
+      "minimum_improvement_pct": 1.0,
+      "mean_speedup": 1.0231646690116658,
+      "p95_speedup": 1.0236858603309655,
+      "reason": "mean and p95 improve by at least 1%"
+    },
+    "cudagraph_pinned_e2e_wall": {
+      "accepted": true,
+      "minimum_improvement_pct": 1.0,
+      "mean_speedup": 1.0234060021770703,
+      "p95_speedup": 1.0207081381159897,
+      "reason": "mean and p95 improve by at least 1%"
+    }
+  }
+}

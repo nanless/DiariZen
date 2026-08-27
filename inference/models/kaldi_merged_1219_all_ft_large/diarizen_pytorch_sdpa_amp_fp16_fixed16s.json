@@ -1,0 +1,147 @@
+{
+  "status": "ok",
+  "mode": "sdpa_amp_fp16",
+  "fixed_input": {
+    "shape": [
+      1,
+      1,
+      256000
+    ],
+    "seconds": 16,
+    "sample_rate": 16000,
+    "batch": 1,
+    "seed": 3407,
+    "distribution": "torch.randn"
+  },
+  "warmup": 10,
+  "repeats": 50,
+  "started_at": "2026-08-27T09:45:37.020502+00:00",
+  "repo": "/root/code/github_repos/DiariZen",
+  "config": "/root/code/github_repos/DiariZen/recipes/diar_ssl/exp/kaldi_merged_1219_all_ft_large/config__2025_12_26--11_44_15.toml",
+  "checkpoint": "/root/code/github_repos/DiariZen/recipes/diar_ssl/exp/kaldi_merged_1219_all_ft_large/checkpoints/epoch_0016/pytorch_model.bin",
+  "pid": 220792,
+  "flock_contract": "/tmp/diarizen_l4_benchmark.lock",
+  "gpu_preflight_after_lock": {
+    "raw_gpu": "2026/08/27 09:45:37.033, 0, NVIDIA L4, GPU-841c039c-20c0-5e12-c07c-9375d60a6e38, 535.129.03, 23034, 1, 6, 67, P0",
+    "raw_compute_processes": "",
+    "timestamp": "2026/08/27 09:45:37.033",
+    "index": 0,
+    "name": "NVIDIA L4",
+    "uuid": "GPU-841c039c-20c0-5e12-c07c-9375d60a6e38",
+    "driver_version": "535.129.03",
+    "memory_total_mib": 23034,
+    "memory_used_mib": 1,
+    "utilization_gpu_percent": 6,
+    "temperature_c": 67,
+    "pstate": "P0"
+  },
+  "environment": {
+    "python": "3.10.18 | packaged by conda-forge | (main, Jun  4 2025, 14:45:41) [GCC 13.3.0]",
+    "platform": "Linux-5.4.250-9-velinux1-amd64-x86_64-with-glibc2.31",
+    "torch": "2.1.1",
+    "torch_cuda": "12.1",
+    "cudnn": 8902,
+    "cuda_available": true,
+    "device_name": "NVIDIA L4",
+    "capability": [
+      8,
+      9
+    ],
+    "tf32_matmul": false,
+    "tf32_cudnn": true,
+    "flash_sdp_enabled": true,
+    "mem_efficient_sdp_enabled": true,
+    "math_sdp_enabled": true,
+    "torch_compile_available": true
+  },
+  "model_config": {
+    "path": "diarizen.models.eend.model_wavlm_conformer.Model",
+    "args": {
+      "wavlm_src": "wavlm_large_s80_md",
+      "wavlm_layer_num": 25,
+      "wavlm_feat_dim": 1024,
+      "attention_in": 256,
+      "ffn_hidden": 1024,
+      "num_head": 4,
+      "num_layer": 4,
+      "dropout": 0.1,
+      "chunk_size": 8,
+      "use_posi": false,
+      "output_activate_function": false,
+      "selected_channel": 0,
+      "max_speakers_per_chunk": 4,
+      "max_speakers_per_frame": 4
+    }
+  },
+  "output": {
+    "raw_kind": "powerset log probabilities",
+    "raw_shape": [
+      1,
+      799,
+      16
+    ],
+    "raw_dtype": "torch.float32",
+    "hard_kind": "powerset argmax mapped to hard multilabel",
+    "hard_shape": [
+      1,
+      799,
+      4
+    ],
+    "hard_dtype": "torch.float32",
+    "candidate_vs_eager_fp32_raw": {
+      "max_abs": 0.014537811279296875,
+      "mean_abs": 0.0028240815736353397,
+      "allclose_rtol_1e-3_atol_1e-3": false
+    },
+    "candidate_vs_eager_amp_fp16_raw": {
+      "max_abs": 0.015535354614257812,
+      "mean_abs": 0.0014588828198611736,
+      "allclose_rtol_1e-3_atol_1e-3": false
+    },
+    "candidate_vs_eager_fp32_hard": {
+      "mismatch_cells": 0,
+      "total_cells": 3196,
+      "mismatch_rate": 0.0,
+      "exact": true
+    },
+    "candidate_vs_eager_amp_fp16_hard": {
+      "mismatch_cells": 0,
+      "total_cells": 3196,
+      "mismatch_rate": 0.0,
+      "exact": true
+    },
+    "eager_amp_fp16_vs_eager_fp32_raw": {
+      "max_abs": 0.017181396484375,
+      "mean_abs": 0.002886564005166292,
+      "allclose_rtol_1e-3_atol_1e-3": false
+    },
+    "eager_amp_fp16_vs_eager_fp32_hard": {
+      "mismatch_cells": 0,
+      "total_cells": 3196,
+      "mismatch_rate": 0.0,
+      "exact": true
+    }
+  },
+  "gpu_before_timed_loop_after_lock": {
+    "raw": "2026/08/27 09:45:43.168, 1115 MiB, 93 %, 67, P0",
+    "compute_processes": "1649243, [Not Found], 1108 MiB"
+  },
+  "timing": {
+    "repeats": 50,
+    "mean_ms": 36.308105662465096,
+    "p50_ms": 36.19825467467308,
+    "p95_ms": 36.96362115442753,
+    "min_ms": 35.10235995054245,
+    "max_ms": 37.92850859463215,
+    "audio_seconds_per_second": 440.6729491409577,
+    "rtf": 0.0022692566039040686,
+    "measurement": "host perf_counter around forward with cuda synchronize before and after"
+  },
+  "memory": {
+    "peak_allocated_mib_timed_loop": 627.45068359375,
+    "peak_reserved_mib_timed_loop": 864.0,
+    "allocated_mib_after": 276.07470703125,
+    "reserved_mib_after": 864.0
+  },
+  "finished_at": "2026-08-27T09:45:45.002144+00:00"
+}

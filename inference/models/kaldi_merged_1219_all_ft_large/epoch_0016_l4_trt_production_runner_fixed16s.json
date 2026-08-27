@@ -1,0 +1,343 @@
+{
+  "scope": "fixed16s synthetic only; batch=1; shape=[1,1,256000]",
+  "started_utc": "2026-08-27T09:45:24.095063+00:00",
+  "finished_utc": "2026-08-27T09:45:36.676153+00:00",
+  "pid": 220719,
+  "flock_required_by_launcher": "/tmp/diarizen_l4_benchmark.lock",
+  "versions": {
+    "tensorrt": "10.10.0.31",
+    "cuda_runtime_integer": 12010
+  },
+  "engine": {
+    "path": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s/segmentation_16s_bs1_fp16.plan",
+    "bytes": 171371492,
+    "sha256": "97efeda97c7f9998af17c1909289ef084215daa277ca34c91555d46e97232fac",
+    "input_name": "waveforms",
+    "input_shape": [
+      1,
+      1,
+      256000
+    ],
+    "output_name": "multilabel",
+    "output_shape": [
+      1,
+      799,
+      4
+    ]
+  },
+  "artifact": {
+    "path": "/tmp/diarizen_trt_synthetic_refs_16s/ort_fp32_synthetic_16s_bs1.npz",
+    "bytes": 1037306,
+    "sha256": "b5e629b6b5313b8a21ce38e8fe8ef152e28534e27f183eaaea8eca33c243362c"
+  },
+  "warmup": 20,
+  "repeats": 200,
+  "snapshots": [
+    {
+      "label": "before_runner_warmup",
+      "utc": "2026-08-27T09:45:24.613946+00:00",
+      "gpu": "0, NVIDIA L4, 535.129.03, 579, 4, P0",
+      "compute_processes": [
+        {
+          "pid": 1648693,
+          "name": "[Not Found]",
+          "memory_mib": "572"
+        }
+      ],
+      "runner_host_gpu_pid": 1648693,
+      "external_processes": []
+    },
+    {
+      "label": "before_preallocated_compute_only",
+      "utc": "2026-08-27T09:45:24.875716+00:00",
+      "gpu": "0, NVIDIA L4, 535.129.03, 579, 91, P0",
+      "compute_processes": [
+        {
+          "pid": 1648693,
+          "name": "[Not Found]",
+          "memory_mib": "572"
+        }
+      ],
+      "runner_host_gpu_pid": 1648693,
+      "external_processes": []
+    },
+    {
+      "label": "before_per_request_device_alloc_pinned_async",
+      "utc": "2026-08-27T09:45:27.192237+00:00",
+      "gpu": "0, NVIDIA L4, 535.129.03, 579, 100, P0",
+      "compute_processes": [
+        {
+          "pid": 1648693,
+          "name": "[Not Found]",
+          "memory_mib": "572"
+        }
+      ],
+      "runner_host_gpu_pid": 1648693,
+      "external_processes": []
+    },
+    {
+      "label": "before_preallocated_pageable_async_e2e",
+      "utc": "2026-08-27T09:45:29.513546+00:00",
+      "gpu": "0, NVIDIA L4, 535.129.03, 579, 99, P0",
+      "compute_processes": [
+        {
+          "pid": 1648693,
+          "name": "[Not Found]",
+          "memory_mib": "572"
+        }
+      ],
+      "runner_host_gpu_pid": 1648693,
+      "external_processes": []
+    },
+    {
+      "label": "before_preallocated_pinned_async_e2e",
+      "utc": "2026-08-27T09:45:31.844941+00:00",
+      "gpu": "0, NVIDIA L4, 535.129.03, 579, 99, P0",
+      "compute_processes": [
+        {
+          "pid": 1648693,
+          "name": "[Not Found]",
+          "memory_mib": "572"
+        }
+      ],
+      "runner_host_gpu_pid": 1648693,
+      "external_processes": []
+    },
+    {
+      "label": "before_cuda_runtime_graph_capture",
+      "utc": "2026-08-27T09:45:34.168097+00:00",
+      "gpu": "0, NVIDIA L4, 535.129.03, 579, 100, P0",
+      "compute_processes": [
+        {
+          "pid": 1648693,
+          "name": "[Not Found]",
+          "memory_mib": "572"
+        }
+      ],
+      "runner_host_gpu_pid": 1648693,
+      "external_processes": []
+    },
+    {
+      "label": "before_cuda_runtime_graph_benchmark",
+      "utc": "2026-08-27T09:45:34.414622+00:00",
+      "gpu": "0, NVIDIA L4, 535.129.03, 583, 82, P0",
+      "compute_processes": [
+        {
+          "pid": 1648693,
+          "name": "[Not Found]",
+          "memory_mib": "576"
+        }
+      ],
+      "runner_host_gpu_pid": 1648693,
+      "external_processes": []
+    },
+    {
+      "label": "after_all_benchmarks",
+      "utc": "2026-08-27T09:45:36.676084+00:00",
+      "gpu": "0, NVIDIA L4, 535.129.03, 583, 100, P0",
+      "compute_processes": [
+        {
+          "pid": 1648693,
+          "name": "[Not Found]",
+          "memory_mib": "576"
+        }
+      ],
+      "runner_host_gpu_pid": 1648693,
+      "external_processes": []
+    }
+  ],
+  "results": {
+    "preallocated_compute_only": {
+      "gpu_latency": {
+        "mean_ms": 11.3565615940094,
+        "p50_ms": 11.332047939300537,
+        "p95_ms": 11.713035535812377,
+        "min_ms": 9.763360023498535,
+        "max_ms": 11.854944229125977
+      },
+      "host_enqueue": {
+        "mean_ms": 1.39251092,
+        "p50_ms": 1.3784765,
+        "p95_ms": 1.4663954,
+        "min_ms": 1.340619,
+        "max_ms": 1.80914
+      },
+      "wall_latency": {
+        "mean_ms": 11.366062535000001,
+        "p50_ms": 11.342551499999999,
+        "p95_ms": 11.722526199999999,
+        "min_ms": 9.770666,
+        "max_ms": 11.86327
+      },
+      "audio_seconds_per_second": 1408.8771383444105
+    },
+    "per_request_device_alloc_pinned_async_e2e": {
+      "gpu_pipeline_latency": {
+        "mean_ms": 11.374181141853333,
+        "p50_ms": 11.416288375854492,
+        "p95_ms": 11.64569296836853,
+        "min_ms": 9.610400199890137,
+        "max_ms": 11.895520210266113
+      },
+      "host_pipeline_enqueue_excludes_alloc_free": {
+        "mean_ms": 1.4226022849999997,
+        "p50_ms": 1.4023370000000002,
+        "p95_ms": 1.5369324499999997,
+        "min_ms": 1.354379,
+        "max_ms": 1.90235
+      },
+      "wall_latency_includes_alloc_free": {
+        "mean_ms": 11.45038767,
+        "p50_ms": 11.49242,
+        "p95_ms": 11.726086099999998,
+        "min_ms": 9.690593,
+        "max_ms": 11.968735
+      },
+      "parity": {
+        "shape": [
+          1,
+          799,
+          4
+        ],
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "exact_match_pct": 100.0,
+        "mismatched_cells": 0,
+        "actual_value_counts": {
+          "0.0": 3196
+        },
+        "reference_value_counts": {
+          "0.0": 3196
+        }
+      }
+    },
+    "preallocated_pageable_async_e2e": {
+      "gpu_pipeline_latency": {
+        "mean_ms": 11.47270384311676,
+        "p50_ms": 11.50708818435669,
+        "p95_ms": 11.6557373046875,
+        "min_ms": 9.882207870483398,
+        "max_ms": 11.988703727722168
+      },
+      "host_enqueue": {
+        "mean_ms": 11.465829014999999,
+        "p50_ms": 11.500548,
+        "p95_ms": 11.649152950000001,
+        "min_ms": 9.869706,
+        "max_ms": 11.983018
+      },
+      "wall_latency": {
+        "mean_ms": 11.480239915,
+        "p50_ms": 11.5146045,
+        "p95_ms": 11.6631058,
+        "min_ms": 9.888047,
+        "max_ms": 11.99597
+      },
+      "parity": {
+        "shape": [
+          1,
+          799,
+          4
+        ],
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "exact_match_pct": 100.0,
+        "mismatched_cells": 0,
+        "actual_value_counts": {
+          "0.0": 3196
+        },
+        "reference_value_counts": {
+          "0.0": 3196
+        }
+      }
+    },
+    "preallocated_pinned_async_e2e": {
+      "gpu_pipeline_latency": {
+        "mean_ms": 11.421112499237061,
+        "p50_ms": 11.4551682472229,
+        "p95_ms": 11.669478750228881,
+        "min_ms": 9.628288269042969,
+        "max_ms": 11.908576011657715
+      },
+      "host_enqueue": {
+        "mean_ms": 1.42493133,
+        "p50_ms": 1.4041745,
+        "p95_ms": 1.563672,
+        "min_ms": 1.352306,
+        "max_ms": 1.956506
+      },
+      "wall_latency": {
+        "mean_ms": 11.4313914,
+        "p50_ms": 11.465288000000001,
+        "p95_ms": 11.67889585,
+        "min_ms": 9.637459,
+        "max_ms": 11.919688
+      },
+      "parity": {
+        "shape": [
+          1,
+          799,
+          4
+        ],
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "exact_match_pct": 100.0,
+        "mismatched_cells": 0,
+        "actual_value_counts": {
+          "0.0": 3196
+        },
+        "reference_value_counts": {
+          "0.0": 3196
+        }
+      }
+    },
+    "cuda_runtime_graph_pinned_async_e2e": {
+      "capture_api": "cudaStreamBeginCapture/cudaStreamEndCapture + cudaGraphInstantiateWithFlags + cudaGraphLaunch",
+      "torch_cuda_cudagraph_used": false,
+      "graph_node_count": 396,
+      "graph_node_type_counts": {
+        "memcpy": 2,
+        "kernel": 391,
+        "memset": 3
+      },
+      "gpu_pipeline_latency": {
+        "mean_ms": 11.123615031242371,
+        "p50_ms": 11.154143810272217,
+        "p95_ms": 11.438622379302979,
+        "min_ms": 9.469568252563477,
+        "max_ms": 11.57811164855957
+      },
+      "host_enqueue": {
+        "mean_ms": 0.00786541,
+        "p50_ms": 0.006502,
+        "p95_ms": 0.013681299999999985,
+        "min_ms": 0.005544,
+        "max_ms": 0.034101
+      },
+      "wall_latency": {
+        "mean_ms": 11.132366885000001,
+        "p50_ms": 11.1622715,
+        "p95_ms": 11.446536049999999,
+        "min_ms": 9.485485,
+        "max_ms": 11.586281
+      },
+      "parity": {
+        "shape": [
+          1,
+          799,
+          4
+        ],
+        "max_abs": 0.0,
+        "mean_abs": 0.0,
+        "exact_match_pct": 100.0,
+        "mismatched_cells": 0,
+        "actual_value_counts": {
+          "0.0": 3196
+        },
+        "reference_value_counts": {
+          "0.0": 3196
+        }
+      }
+    }
+  }
+}

@@ -159,4 +159,5 @@ inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010/
 inference/models/kaldi_merged_1219_all_ft_large/trt_l4_precisions/
 inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s/
 inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_dynamic/
+inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s_builder_search/
 *.log.old

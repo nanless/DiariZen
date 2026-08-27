@@ -1,0 +1,178 @@
+{
+  "status": "ok",
+  "mode": "compile_default_amp_fp16",
+  "fixed_input": {
+    "shape": [
+      1,
+      1,
+      256000
+    ],
+    "seconds": 16,
+    "sample_rate": 16000,
+    "batch": 1,
+    "seed": 3407,
+    "distribution": "torch.randn"
+  },
+  "warmup": 10,
+  "repeats": 50,
+  "started_at": "2026-08-27T09:46:00.460922+00:00",
+  "repo": "/root/code/github_repos/DiariZen",
+  "config": "/root/code/github_repos/DiariZen/recipes/diar_ssl/exp/kaldi_merged_1219_all_ft_large/config__2025_12_26--11_44_15.toml",
+  "checkpoint": "/root/code/github_repos/DiariZen/recipes/diar_ssl/exp/kaldi_merged_1219_all_ft_large/checkpoints/epoch_0016/pytorch_model.bin",
+  "pid": 220929,
+  "flock_contract": "/tmp/diarizen_l4_benchmark.lock",
+  "gpu_preflight_after_lock": {
+    "raw_gpu": "2026/08/27 09:46:00.474, 0, NVIDIA L4, GPU-841c039c-20c0-5e12-c07c-9375d60a6e38, 535.129.03, 23034, 1, 0, 58, P8",
+    "raw_compute_processes": "",
+    "timestamp": "2026/08/27 09:46:00.474",
+    "index": 0,
+    "name": "NVIDIA L4",
+    "uuid": "GPU-841c039c-20c0-5e12-c07c-9375d60a6e38",
+    "driver_version": "535.129.03",
+    "memory_total_mib": 23034,
+    "memory_used_mib": 1,
+    "utilization_gpu_percent": 0,
+    "temperature_c": 58,
+    "pstate": "P8"
+  },
+  "environment": {
+    "python": "3.10.18 | packaged by conda-forge | (main, Jun  4 2025, 14:45:41) [GCC 13.3.0]",
+    "platform": "Linux-5.4.250-9-velinux1-amd64-x86_64-with-glibc2.31",
+    "torch": "2.1.1",
+    "torch_cuda": "12.1",
+    "cudnn": 8902,
+    "cuda_available": true,
+    "device_name": "NVIDIA L4",
+    "capability": [
+      8,
+      9
+    ],
+    "tf32_matmul": false,
+    "tf32_cudnn": true,
+    "flash_sdp_enabled": true,
+    "mem_efficient_sdp_enabled": true,
+    "math_sdp_enabled": true,
+    "torch_compile_available": true
+  },
+  "model_config": {
+    "path": "diarizen.models.eend.model_wavlm_conformer.Model",
+    "args": {
+      "wavlm_src": "wavlm_large_s80_md",
+      "wavlm_layer_num": 25,
+      "wavlm_feat_dim": 1024,
+      "attention_in": 256,
+      "ffn_hidden": 1024,
+      "num_head": 4,
+      "num_layer": 4,
+      "dropout": 0.1,
+      "chunk_size": 8,
+      "use_posi": false,
+      "output_activate_function": false,
+      "selected_channel": 0,
+      "max_speakers_per_chunk": 4,
+      "max_speakers_per_frame": 4
+    }
+  },
+  "output": {
+    "raw_kind": "powerset log probabilities",
+    "raw_shape": [
+      1,
+      799,
+      16
+    ],
+    "raw_dtype": "torch.float32",
+    "hard_kind": "powerset argmax mapped to hard multilabel",
+    "hard_shape": [
+      1,
+      799,
+      4
+    ],
+    "hard_dtype": "torch.float32",
+    "candidate_vs_eager_fp32_raw": {
+      "max_abs": 0.014474868774414062,
+      "mean_abs": 0.00278997840359807,
+      "allclose_rtol_1e-3_atol_1e-3": false
+    },
+    "candidate_vs_eager_amp_fp16_raw": {
+      "max_abs": 0.013082504272460938,
+      "mean_abs": 0.0032739294692873955,
+      "allclose_rtol_1e-3_atol_1e-3": false
+    },
+    "candidate_vs_eager_fp32_hard": {
+      "mismatch_cells": 0,
+      "total_cells": 3196,
+      "mismatch_rate": 0.0,
+      "exact": true
+    },
+    "candidate_vs_eager_amp_fp16_hard": {
+      "mismatch_cells": 0,
+      "total_cells": 3196,
+      "mismatch_rate": 0.0,
+      "exact": true
+    },
+    "eager_amp_fp16_vs_eager_fp32_raw": {
+      "max_abs": 0.017181396484375,
+      "mean_abs": 0.002886564005166292,
+      "allclose_rtol_1e-3_atol_1e-3": false
+    },
+    "eager_amp_fp16_vs_eager_fp32_hard": {
+      "mismatch_cells": 0,
+      "total_cells": 3196,
+      "mismatch_rate": 0.0,
+      "exact": true
+    }
+  },
+  "gpu_before_timed_loop_after_lock": {
+    "raw": "2026/08/27 09:47:25.900, 1363 MiB, 91 %, 59, P0",
+    "compute_processes": "1650259, [Not Found], 1356 MiB"
+  },
+  "timing": {
+    "repeats": 50,
+    "mean_ms": 19.863880686461926,
+    "p50_ms": 19.808242097496986,
+    "p95_ms": 20.39569430053234,
+    "min_ms": 18.32333765923977,
+    "max_ms": 20.517444238066673,
+    "audio_seconds_per_second": 805.4820834130702,
+    "rtf": 0.0012414925429038704,
+    "measurement": "host perf_counter around forward with cuda synchronize before and after"
+  },
+  "memory": {
+    "peak_allocated_mib_timed_loop": 478.91796875,
+    "peak_reserved_mib_timed_loop": 1110.0,
+    "allocated_mib_after": 315.11328125,
+    "reserved_mib_after": 1110.0
+  },
+  "compile": {
+    "torch_compile_mode": "default",
+    "first_call_seconds_including_compile": 79.61118131689727,
+    "dynamo_counters": {
+      "frames": {
+        "total": 24,
+        "ok": 24
+      },
+      "inline_call": {
+        "call_method NNModuleVariable() _forward_unimplemented [TensorVariable(), ConstantVariable(int), ConstantVariable(NoneType)] OrderedDict()": 4,
+        "call_function BuiltinVariable(NotImplementedError) [ConstantVariable(str)] {}": 6
+      },
+      "unimplemented": {},
+      "graph_break": {
+        "call_method NNModuleVariable() _forward_unimplemented [TensorVariable(), ConstantVariable(int), ConstantVariable(NoneType)] OrderedDict()": 3,
+        "call_function BuiltinVariable(NotImplementedError) [ConstantVariable(str)] {}": 6
+      },
+      "stats": {
+        "calls_captured": 1323,
+        "unique_graphs": 22
+      },
+      "inductor": {
+        "pattern_matcher_count": 1015,
+        "pattern_matcher_nodes": 1122
+      },
+      "aot_autograd": {
+        "total": 22,
+        "ok": 22
+      }
+    }
+  },
+  "finished_at": "2026-08-27T09:47:26.910900+00:00"
+}

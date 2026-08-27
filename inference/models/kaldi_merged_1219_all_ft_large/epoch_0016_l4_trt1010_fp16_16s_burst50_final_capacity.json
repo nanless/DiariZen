@@ -1,0 +1,111 @@
+{
+  "scope": "fixed 16-second synthetic input, batch=1, 50-request burst",
+  "engine": "inference/models/kaldi_merged_1219_all_ft_large/trt_l4_trt1010_16s/segmentation_16s_bs1_fp16.plan",
+  "engine_metadata": {
+    "bytes": 171371492,
+    "sha256": "97efeda97c7f9998af17c1909289ef084215daa277ca34c91555d46e97232fac"
+  },
+  "input_shape": [
+    1,
+    1,
+    256000
+  ],
+  "created_utc": "2026-08-27T10:11:24.813739+00:00",
+  "environment": {
+    "gpu": "NVIDIA L4",
+    "compute_capability": [
+      8,
+      9
+    ],
+    "torch": "2.3.1+cu121",
+    "torch_cuda": "12.1",
+    "tensorrt": "10.10.0.31"
+  },
+  "benchmark_lock_contract": "/tmp/diarizen_l4_benchmark.lock",
+  "warmup_bursts": 3,
+  "repeats": 30,
+  "results": [
+    {
+      "mode": "enqueue_pinned_e2e",
+      "streams": 2,
+      "requests": 50,
+      "burst_mean_ms": 543.935282,
+      "burst_p50_ms": 544.007324,
+      "burst_p95_ms": 547.259561,
+      "request_completion_p50_mean_ms": 282.622889,
+      "request_completion_p95_mean_ms": 522.151867,
+      "requests_per_second": 91.923,
+      "graph_node_counts": [
+        394,
+        394
+      ],
+      "graph_parity": [
+        {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        },
+        {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        }
+      ],
+      "device_memory_used_mib_all_groups": 825.0
+    },
+    {
+      "mode": "cudagraph_pinned_e2e",
+      "streams": 2,
+      "requests": 50,
+      "burst_mean_ms": 545.912349,
+      "burst_p50_ms": 545.983307,
+      "burst_p95_ms": 548.983621,
+      "request_completion_p50_mean_ms": 283.821322,
+      "request_completion_p95_mean_ms": 524.139115,
+      "requests_per_second": 91.59,
+      "graph_node_counts": [
+        394,
+        394
+      ],
+      "graph_parity": [
+        {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        },
+        {
+          "exact": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "output_shape": [
+            1,
+            799,
+            4
+          ],
+          "output_dtype": "torch.float32"
+        }
+      ],
+      "device_memory_used_mib_all_groups": 825.0
+    }
+  ],
+  "method": "all workers/graphs allocated once; combinations measured in forward/reverse alternating order to reduce thermal and clock-order bias",
+  "device_memory_note": "device_memory_used_mib_all_groups is process-wide memory after allocating every requested stream-count group, not per-context memory"
+}

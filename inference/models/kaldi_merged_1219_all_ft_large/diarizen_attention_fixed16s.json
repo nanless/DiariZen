@@ -1,0 +1,164 @@
+{
+  "status": "ok",
+  "started_at": "2026-08-27T09:45:49.438805+00:00",
+  "input_context": {
+    "audio_seconds": 16,
+    "waveform_shape": [
+      1,
+      1,
+      256000
+    ],
+    "post_conv_sequence_length": 799
+  },
+  "warmup": 20,
+  "repeats": 100,
+  "gpu_preflight_after_lock": {
+    "raw_gpu": "2026/08/27 09:45:49.452, 0, NVIDIA L4, 535.129.03, 23034, 1, 0, 62, P0",
+    "raw_compute_processes": "",
+    "memory_used_mib": 1,
+    "utilization_gpu_percent": 0
+  },
+  "environment": {
+    "torch": "2.1.1",
+    "cuda": "12.1",
+    "device": "NVIDIA L4",
+    "capability": [
+      8,
+      9
+    ]
+  },
+  "cases": {
+    "wavlm_large": {
+      "shape": {
+        "q": [
+          1,
+          16,
+          799,
+          64
+        ],
+        "dense_additive_mask": true
+      },
+      "manual": {
+        "mean_ms": 0.5292004719376564,
+        "p50_ms": 0.5217902362346649,
+        "p95_ms": 0.5804430693387985,
+        "repeats": 100,
+        "peak_allocated_mib": 80.609375
+      },
+      "sdpa_auto": {
+        "mean_ms": 0.23975638672709465,
+        "p50_ms": 0.23981183767318726,
+        "p95_ms": 0.24866685271263123,
+        "repeats": 100,
+        "peak_allocated_mib": 60.609375,
+        "speedup_vs_manual": 2.20724243955188
+      },
+      "sdpa_vs_manual": {
+        "max_abs": 0.001220703125,
+        "mean_abs": 3.4016578865703195e-05
+      },
+      "forced_backends": {
+        "flash_only": {
+          "status": "failed",
+          "error_type": "RuntimeError",
+          "error": "No available kernel.  Aborting execution."
+        },
+        "mem_efficient_only": {
+          "status": "ok",
+          "timing": {
+            "mean_ms": 0.20341206341981888,
+            "p50_ms": 0.1952238380908966,
+            "p95_ms": 0.22883154451847076,
+            "repeats": 100,
+            "peak_allocated_mib": 60.609375
+          }
+        },
+        "math_only": {
+          "status": "ok",
+          "timing": {
+            "mean_ms": 0.39312368258833885,
+            "p50_ms": 0.40304288268089294,
+            "p95_ms": 0.4247743636369705,
+            "repeats": 100,
+            "peak_allocated_mib": 80.609375
+          }
+        }
+      },
+      "sdpa_auto_profiler_attention_ops": [
+        "aten::scaled_dot_product_attention",
+        "aten::_scaled_dot_product_efficient_attention",
+        "aten::_efficient_attention_forward",
+        "fmha_cutlassF_f16_aligned_64x64_rf_sm80(PyTorchMemEffAttention::AttentionKernel<cutlass::half_t, cutlass::arch::Sm80, true, 64, 64, 64, true, true>::Params)"
+      ]
+    },
+    "conformer": {
+      "shape": {
+        "q": [
+          1,
+          4,
+          799,
+          64
+        ],
+        "dense_additive_mask": false
+      },
+      "manual": {
+        "mean_ms": 0.12204546481370926,
+        "p50_ms": 0.11706538498401642,
+        "p95_ms": 0.15194527804851532,
+        "repeats": 100,
+        "peak_allocated_mib": 21.75
+      },
+      "sdpa_auto": {
+        "mean_ms": 0.05421888083219528,
+        "p50_ms": 0.053647905588150024,
+        "p95_ms": 0.05953572690486908,
+        "repeats": 100,
+        "peak_allocated_mib": 11.24609375,
+        "speedup_vs_manual": 2.25097720462792
+      },
+      "sdpa_vs_manual": {
+        "max_abs": 0.000732421875,
+        "mean_abs": 2.745124038483482e-05
+      },
+      "forced_backends": {
+        "flash_only": {
+          "status": "ok",
+          "timing": {
+            "mean_ms": 0.0813872367143631,
+            "p50_ms": 0.07997080683708191,
+            "p95_ms": 0.09091943502426147,
+            "repeats": 100,
+            "peak_allocated_mib": 12.03955078125
+          }
+        },
+        "mem_efficient_only": {
+          "status": "ok",
+          "timing": {
+            "mean_ms": 0.05809817463159561,
+            "p50_ms": 0.05742162466049194,
+            "p95_ms": 0.06281398236751556,
+            "repeats": 100,
+            "peak_allocated_mib": 11.24609375
+          }
+        },
+        "math_only": {
+          "status": "ok",
+          "timing": {
+            "mean_ms": 0.1014980673789978,
+            "p50_ms": 0.09965337812900543,
+            "p95_ms": 0.11200830340385437,
+            "repeats": 100,
+            "peak_allocated_mib": 21.75
+          }
+        }
+      },
+      "sdpa_auto_profiler_attention_ops": [
+        "aten::scaled_dot_product_attention",
+        "aten::_scaled_dot_product_efficient_attention",
+        "aten::_efficient_attention_forward",
+        "fmha_cutlassF_f16_aligned_64x64_rf_sm80(PyTorchMemEffAttention::AttentionKernel<cutlass::half_t, cutlass::arch::Sm80, true, 64, 64, 64, true, true>::Params)"
+      ]
+    }
+  },
+  "finished_at": "2026-08-27T09:45:51.771998+00:00"
+}

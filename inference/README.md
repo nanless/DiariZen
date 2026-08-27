@@ -14,6 +14,27 @@
 - `utils.py`: 轻量工具函数（扫文件、读音频、frames->segments、写 RTTM）
 - `models/`: 导出的 ONNX 模型默认输出目录
 
+### L4 最长 16 秒、并发 50 的生产结论
+
+`kaldi_merged_1219_all_ft_large/epoch_0016` 在 `dev_L4_1gpus` 上的新增加速实验全部使用固定 **16 秒 synthetic** 输入，不使用真实音频。详细数字、限制和产物见：
+
+- `inference/models/kaldi_merged_1219_all_ft_large/SEGMENTATION_BENCHMARK_REPORT.md`
+- `inference/ADR_L4_ONLINE_SERVING_16S_CONCURRENCY50.md`
+- `docs/plans/2026-08-27-l4-inference-acceleration-design.md`
+
+最终主路径是 TensorRT 10.10 FP16、batch=1、两个预分配 execution contexts。每个 context 独占 pinned host/device buffer 和 CUDA stream，engine 只反序列化一次。单槽位活跃时 replay 完整 H2D→TensorRT→D2H CUDA Graph，单 context 的 50 请求 burst mean/p95 改善约 2.67%/2.92%，host enqueue 降至约 8µs；双槽六模式差异约 0.21%，因此不实现复杂的固定 hybrid 调度，最终双槽 pinned enqueue 实测约 91.9 req/s。动态合批、4/8 contexts、当前 FP8/INT8/INT4、强制 Flash、O4/O5 builder plan 均不采用。
+
+其他后端也完成了固定 16 秒对照：ORT CUDA Graph 比普通 ORT 快 2.09%，但仍比 TensorRT 慢 3.54×；真正按“先 SDPA patch、再 compile”执行的 PyTorch `compile(mode="reduce-overhead")+SDPA+AMP` 为 18.464ms，比 eager AMP 快 2.12×，但仍比 TensorRT 慢 1.72×。ORT Graph 是可选一级回退；PyTorch 组合路径是实验性二级候选。两者都只有 synthetic 路径一致性证据，真实音频未验收前不自动启用。
+
+相关脚本：
+
+- `benchmark_l4_runtime_acceleration.py`：TensorRT enqueue/pinned/CUDA Graph 配对测试。
+- `tensorrt_cuda_graph_runner.py`：只依赖 NumPy、TensorRT 和 libcudart 的完整链路参考 runner。
+- `benchmark_trt_online_burst_acceleration.py`：50 请求、单/双 context 的六模式交错压测。
+- `benchmark_trt_builder_search.py`：builder optimization/workspace/aux stream 搜索。
+- `benchmark_ort_cuda_graph_fixed16s.py`：ORT IOBinding/CUDA Graph。
+- `benchmark_pytorch_compile_fixed16s.py`、`benchmark_attention_sdpa_fixed16s.py`：PyTorch compile/SDPA。
+
 ### Quickstart
 
 #### 1) 导出 ONNX（best 和 epoch_0010）
@@ -105,4 +126,3 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 conda run --no-capture-output -n diarizen python
   --providers cuda,cpu \
   --torch-tf32 0 --ort-tf32 0 --deterministic 1
 ```
-

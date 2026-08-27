@@ -60,7 +60,7 @@
 
 | 维度 | 结论 |
 |------|------|
-| **推荐部署** | L4 固定 10s 性能首选 **TensorRT 10.10 FP16**；ORT CUDA FP32 保留为已验证生产基线 |
+| **推荐部署** | L4 最长 16s 首选 **TensorRT 10.10 FP16**；固定 buffer + pinned memory + 独立 context/stream，单活跃槽位使用完整 CUDA Graph |
 | **50 条 10s 墙钟** | **233 ms**（均摊 4.7 ms/条），约为 PyTorch FP16 的 **1.5×** 加速 |
 | **精度** | ORT vs PyTorch FP32：帧一致 **99.998%**，cross DER **0.004%**（几乎无损） |
 | **PyTorch FP16** | 大 batch 有加速，但不如 ORT；cross DER +0.26%（可接受） |
@@ -72,11 +72,14 @@
 | **L4 TensorRT FP16** | 10.10.0.31 已解决旧版崩溃；bs=1/4/8/32 比 ORT FP32 快 **2.96–3.26×** |
 | **L4 TensorRT 多精度** | 已完成严格 FP32、TF32、FP16、BF16、FP8、INT8、INT4 weight-only；四档 batch 中均为 **FP16 最快** |
 | **TensorRT PTQ 精度** | FP8 frame exact 约 **98.99–99.40%**；INT8 仅约 **0.20–0.60%** 且运行时非确定，不可用；INT4 weight-only 为 **96.79%** 且无加速 |
-| **L4 线上 16s** | FP16 batch=1 **10.741ms**；50 条突发用 2 contexts 时总完成 **534.8ms**、请求完成 p95 **514.3ms**、约 **93.5 req/s** |
+| **L4 线上 16s** | FP16 batch=1 **10.741ms**；最终双 context pinned 链路 50 条总完成 mean/p95 **543.9/547.3ms**、请求完成 p95 **522.2ms**、约 **91.9 req/s** |
+| **16s CUDA Graph** | 单 context 全链路 graph 比普通 enqueue mean/p95 快约 **2.6%/2.9%**，host enqueue 从约 1.425ms 降至 0.0079ms；双 context 时 6 种组合差异仅约 0.21%，不宣称额外吞吐收益 |
+| **TensorRT builder 扫描** | O4/O5、8/16GiB workspace、0/2 auxiliary streams 均未稳定优于现有 **O3/8GiB** plan；保留现有 engine |
+| **其他加速路径** | ORT CUDA Graph 仅快 **2.09%** 且仍比 TRT 慢 **3.54×**；真正的 PyTorch `compile(reduce-overhead)+SDPA+AMP` 为 **18.464ms**，比 eager AMP 快 **2.12×**，但仍比 TRT 慢 **1.72×** |
 | **线上 batch 策略** | **禁用动态合批**；16s 的 bs=2/4/8/16/32 每条成本均高于 bs=1，bs=32 吞吐仅为 bs=1 的 63.1% |
 | **可变时长** | 动态 duration plan 覆盖 2–16s；结合固定 10s/16s plan 做长度路由，短音频不必全部补到 16s |
 
-**一句话**：线上最长 16s、并发上限 50 时，使用 **1 张 L4 + TensorRT FP16 + batch=1 + 2 个 execution contexts + 按时长路由**；不要动态合批，ORT CUDA FP32 仅作为独立进程回退。
+**一句话**：线上最长 16s、并发上限 50 时，使用 **1 张 L4 + TensorRT FP16 + batch=1 + 2 个预分配 execution contexts + pinned/设备 buffer 复用 + 按时长路由**；单槽低并发走 CUDA Graph，50 请求突发由双槽队列调度，不做动态合批，ORT CUDA FP32 仅作为独立进程回退。
 
 ---
 
@@ -325,7 +328,7 @@ L4 为 Ada 架构；该模型在 batch=1 时已能很好利用 GPU/L2 cache。ba
 | 4 | 555.050 ms | 557.857 ms | 310.746 ms | 535.477 ms | 90.08 req/s |
 | 8 | 571.648 ms | 574.098 ms | 330.803 ms | 554.939 ms | 87.47 req/s |
 
-2 contexts 是最佳点；4/8 contexts 因共享 SM/L2/DRAM 产生争用。短复测测得 1/2 contexts 常驻设备内存约 **601/813 MiB**。按最坏 16s 请求计算，单卡理论上限约 93.5 req/s；生产按 80% 水位控制在约 **74.8 req/s**，超过时背压或扩到第 2 张 L4。
+2 contexts 是最佳点；4/8 contexts 因共享 SM/L2/DRAM 产生争用。短复测测得 1/2 contexts 常驻设备内存约 **601/813 MiB**。本表是早期未计完整 pinned H2D/D2H 的历史执行基线；93.5 req/s 不再作为最终 admission 口径。最终生产形态复测见 5.8.2：91.923 req/s，admission 向下取整为 73 RPS。
 
 “并发 50”不等于“50 RPS”：前者是同时在途请求数，后者才决定队列是否持续增长。若 50 条最坏请求在同一时刻突发，单卡请求完成 p95 约 514ms；若要求该突发 p95 明显低于 500ms，需要增加 GPU 副本，而不是增大 batch。
 
@@ -350,6 +353,86 @@ L4 为 Ada 架构；该模型在 batch=1 时已能很好利用 GPU/L2 cache。ba
 #### 5.7.4 16 秒 synthetic parity
 
 固定 16s 的 bs=1/2/4/8/16/32 均成功输出 `[B,799,4]`，相对 ORT CPU FP32 reference 的 cell/frame exact 均为 **100%**。普通 harmonic pseudo-speech 在该 hard multilabel 模型上全为零，因此这里只证明 16 秒图执行、输出 shape 和静音边界一致；非零类别仍由 10 秒 adversarial synthetic parity 覆盖。本轮按约束没有运行真实音频或 DER/JER。
+
+### 5.8 L4 固定 16 秒进一步加速实验（2026-08-27）
+
+本节响应“除 TensorRT 外，有收益的路径都尝试”的要求，统一使用固定 `[1,1,256000]` 的 **16 秒 synthetic** 输入；没有运行 10 秒输入或真实音频。结论只比较同一脚本、同一轮交错测量中的配对结果，避免把温度、频率和运行顺序造成的跨进程波动当成加速。
+
+#### 5.8.1 TensorRT 预分配、pinned memory 与 CUDA Graph
+
+对现有 O3/8GiB 固定 16 秒 FP16 plan 预分配 input/output device buffer、pinned host buffer、stream 和 execution context，并使用 CUDA Runtime stream capture 捕获完整执行图。30 次 warmup、200 次计时结果：
+
+| 路径 | GPU mean | GPU p95 | host enqueue mean | 相对对应 enqueue |
+|------|----------|---------|-------------------|------------------|
+| 普通 `enqueue_device` | 10.973ms | 11.250ms | 1.415ms | 基线 |
+| **`cudagraph_device`** | **10.725ms** | **10.995ms** | **0.011ms** | mean **+2.31%**，p95 **+2.26%** |
+| 普通 pinned H2D→TRT→D2H | 11.053ms | 11.178ms | — | 基线 |
+| **完整 graph pinned H2D→TRT→D2H** | **10.799ms** | **10.950ms** | — | mean **+2.30%**，p95 **+2.04%** |
+
+独立、只依赖 `numpy+tensorrt+libcudart` 的生产 runner 再次捕获完整 pinned H2D→TRT→pinned D2H 图，得到 396 个节点（391 kernel、2 memcpy、3 memset）。其 wall mean 从预分配 pinned 的 11.431ms 降至 **11.132ms**，快 **2.62%**；host enqueue 从 1.425ms 降至 **0.0079ms**，约 **181×**。两套实现的 graph 输出与普通 enqueue 均 bit-exact，主实现捕获 394 个节点。这里的 hard output 全零，因此 exact 只证明同一静音边界输入下 graph 没有改变输出；不能证明 16 秒非零类别或阈值附近准确率。
+
+曾尝试直接用 `torch.cuda.CUDAGraph` 包裹 TensorRT，第一次出现不可信的 0.014ms。节点检查发现实际没有捕获 TensorRT 的外部 CUDA 工作，因此该数字已作废。最终改用 `cudaStreamBeginCapture/cudaStreamEndCapture`，并把“节点数必须大于零 + graph/enqueue 输出完全一致”设为硬门槛，避免空图假加速。
+
+#### 5.8.2 50 请求突发下的 Graph 调度
+
+同一 engine 只反序列化一次，各 worker 使用独立 context/buffer/stream；所有 worker/graph 只创建一次，组合按正序/逆序交错，3 次 warmup、30 轮、每轮 50 个 16 秒请求。
+
+单 context 的配对测试中，CUDA Graph 将 device burst mean/p95 从 563.085/570.318ms 降至 **548.028/553.685ms**，分别改善 **2.67%/2.92%**；完整 pinned 链路也改善 **2.60%/2.93%**。
+
+双 context 的最终六模式同轮验证如下：
+
+| 双槽模式 | 50 请求总完成 mean | 总完成 p95 | 请求完成 p95 mean | 吞吐 |
+|----------|-------------------|------------|---------------------|------|
+| enqueue device ×2 | 556.324ms | 561.755ms | 534.810ms | 89.876 req/s |
+| graph device ×2 | 555.938ms | 561.577ms | 533.724ms | 89.938 req/s |
+| graph+enqueue device | 556.754ms | 561.993ms | **531.885ms** | 89.806 req/s |
+| enqueue pinned ×2 | **555.586ms** | 561.570ms | 533.464ms | **89.995 req/s** |
+| graph pinned ×2 | 556.606ms | 562.077ms | 534.355ms | 89.830 req/s |
+| graph+enqueue pinned | 555.731ms | **561.357ms** | **531.076ms** | 89.972 req/s |
+
+六种模式的总完成 mean 最大只差约 **0.21%**，处于运行噪声范围；hybrid 的单次更优结果未在同轮验证中转化为稳定吞吐优势。因此生产上不为双槽引入复杂的固定 hybrid 策略：只有一个槽位忙时优先 replay 完整 CUDA Graph；积压时允许两个预分配槽位并行。
+
+最终生产形态另以 `flock` 独占 GPU，对双 context 的完整 pinned 链路做 3 次 warmup、30 轮复测：普通 enqueue 的 50 请求总完成 mean/p95 为 **543.935/547.260ms**，请求完成 p95 mean 为 **522.152ms**，吞吐 **91.923 req/s**；双 graph 为 91.590 req/s，仍无收益。生产容量因此按最终普通 enqueue pinned 链路 **91.9 req/s** 计算，而 5.7.2 的 93.5 req/s 仅保留为历史无传输基线。
+
+#### 5.8.3 TensorRT builder/tactic 搜索
+
+所有候选都执行相同的直接 CUDA Runtime graph benchmark；选择规则要求 mean 与 p95 都有稳定收益，否则不替换当前 plan。
+
+| Builder 配置 | 构建时间 | graph mean | graph p95 | 决策 |
+|--------------|----------|------------|-----------|------|
+| **O3 / 8GiB / auto** | 现有 | **10.704ms** | 10.993ms | **保留** |
+| O4 / 8GiB / auto | 232.7s | 10.819ms | 10.970ms | mean 回退，拒绝 |
+| O5 / 8GiB / auto | 645.1s | 10.923ms | 11.056ms | 拒绝 |
+| O5 / 8GiB / aux=0 | — | 10.822ms | 10.955ms | 拒绝 |
+| O5 / 8GiB / aux=2 | — | 10.858ms | 11.002ms | 实际未分配 aux stream，拒绝 |
+| O5 / 16GiB / auto | — | 10.790ms | **10.934ms** | p95 略好但 mean 回退，拒绝 |
+
+更高 builder optimization level、加大 workspace 或请求 auxiliary streams 都没有稳定降低延迟；O5 还显著增加构建成本。现有 O3/8GiB plan 是这轮搜索后的 Pareto 选择。
+
+#### 5.8.4 ONNX Runtime CUDA Graph / IOBinding
+
+20 次 warmup、100 次计时：普通 `session.run` 为 38.816ms，固定设备地址 IOBinding 为 38.789ms（仅 **0.07%**），`enable_cuda_graph=1` + IOBinding 为 **38.003ms**，比普通路径快 **2.09%**。输出与基线完全一致，但仍比 TensorRT 固定 16 秒 10.741ms 慢 **3.54×**。profile 记录了 **358 次 CPU EP shape-op 事件**，并非 358 个唯一节点；它说明仍存在 host shape 工作，CUDA Graph 不能消除全部开销。因此只把 ORT Graph 作为回退路径的实验性选项，不改变主后端选择。
+
+#### 5.8.5 PyTorch AMP、SDPA 与 `torch.compile`
+
+10 次 warmup、50 次计时：
+
+| PyTorch 路径 | mean | p95 | 相对 eager AMP | 相对 TRT FP16 |
+|--------------|------|-----|----------------|----------------|
+| eager FP32 | 56.720ms | 57.920ms | — | 5.28× 慢 |
+| eager AMP FP16 | 39.099ms | 43.707ms | 基线 | 3.64× 慢 |
+| SDPA + AMP | 36.308ms | 36.964ms | **+7.14%** | 3.38× 慢 |
+| compile default + AMP | 19.864ms | 20.396ms | **1.97×** | 1.85× 慢 |
+| **compile reduce-overhead + AMP** | **19.298ms** | 19.849ms | **2.03×** | 1.80× 慢 |
+| compile max-autotune + AMP | **19.081ms** | **19.536ms** | **2.05×** | **1.78× 慢** |
+| **compile reduce-overhead + SDPA + AMP** | **18.464ms** | **18.916ms** | **2.12×** | **1.72× 慢** |
+| compile max-autotune + SDPA + AMP | 18.501ms | 19.002ms | 2.11× | 1.72× 慢 |
+
+SDPA 微基准中，WavLM dense relative bias attention 的 auto kernel 比 manual attention 快 **2.21×**；Conformer 无 mask attention 快 **2.25×**。强制 Flash 在 WavLM 非空 mask 下不可用，在 Conformer 上也慢于 auto，因此采用 PyTorch 自动选择，不强制 Flash。
+
+真正的组合路径已经按“先安装 SDPA patch、再 `torch.compile`”补测，JSON 中保存 `sdpa_patch_installed_before_compile=true`。`reduce-overhead+SDPA+AMP` 比非 SDPA 的 reduce-overhead 再快 **4.32%**，且 mean/p95 均略优于 SDPA max-autotune；后者继续提示 L4 SM 数不足，首次编译时间还可能命中持久 Inductor cache。因此 PyTorch 实验性二级回退选择 `reduce-overhead + SDPA + AMP`，启动阶段预编译固定 16 秒 shape。
+
+两条组合路径的 hard output 在这条 synthetic 输入上均为 0/3196 mismatch，但 raw output 相对 eager FP32 未通过 `rtol=atol=1e-3` allclose（reduce-overhead max/mean abs 为 0.01407/0.00279）。这仍是一条全零 hard-output 输入，不能证明真实或非零 16 秒音频精度；没有真实验收前不能把该路径自动提升为生产主回退。该模型当前 `fullgraph=False` 下有 22 个 unique graphs 和 9 个 graph breaks，仍有进一步改写模型 `forward` 的空间，但在当前结果下不会超过 TensorRT。
 
 ---
 
@@ -518,6 +601,14 @@ scheduler:
   queue_capacity: 100
   overload: reject_429_or_route_to_second_l4
 
+runtime:
+  deserialize_engine_once: true
+  buffers: preallocated_pinned_host_and_device_per_context
+  streams: one_independent_stream_per_context
+  single_active_context: replay_full_h2d_trt_d2h_cuda_graph
+  queued_burst: dispatch_to_two_preallocated_contexts
+  cuda_graph_guard: require_nonzero_node_count_and_exact_enqueue_parity
+
 transport:
   protocol: grpc
   payload: pcm_s16le_binary
@@ -532,12 +623,15 @@ fallback:
   backend: onnxruntime
   provider: CUDAExecutionProvider
   deployment: separate_process_in_conda_env_diarizen
+  optional_cuda_graph_iobinding_experimental: true
+  secondary_pytorch_experimental_not_auto_enabled: reduce_overhead_compile_sdpa_amp
 
 capacity_guardrail_worst_case_16s:
-  measured_requests_per_second: 93.5
+  measured_requests_per_second_final_pinned_two_contexts: 91.923
   target_utilization: 0.8
-  admission_requests_per_second: 74.8
-  burst_50_request_completion_p95_ms_gpu_only: 514.3
+  admission_requests_per_second: 73
+  burst_50_total_p95_ms_gpu_only: 547.3
+  burst_50_request_completion_p95_ms_gpu_only: 522.2
 
 avoid:
   - tensorrt_dynamic_batching
@@ -549,13 +643,15 @@ avoid:
   - int4_weight_only_on_l4
   - fp4_on_l4
   - pytorch_eager_production
+  - per_request_cuda_malloc_or_engine_deserialization
+  - forced_flash_attention
 ```
 
-服务层应预分配 pinned host buffer、CUDA input/output buffer，并用两个独立 context/stream 异步 H2D→enqueue→D2H。动态输入向上取整到 1 秒 bucket，避免每个任意 sample 数触发 shape 切换。请求传二进制 PCM16，不传 JSON/base64；解码和重采样尽量放上游。服务启动时加载 plan 并 warmup 所有路由 bucket，健康检查至少验证 2s/10s/16s shape。记录 `decode_ms`、`queue_ms`、`h2d_ms`、`gpu_ms`、`postprocess_ms`、端到端 p50/p95/p99、队列深度、拒绝数和 GPU 显存。
+服务层应只反序列化一次 engine；每个 context 独占一套 pinned host buffer、CUDA input/output buffer 和 stream，禁止逐请求 `cudaMalloc`。固定 shape/地址初始化后捕获完整 H2D→TensorRT→D2H graph；仅一个槽位活跃时 replay graph，积压时向两个槽位轮转派发。双槽 graph/enqueue 的配对差异约 0.21%，所以不引入难以维护的固定 hybrid 状态机，容量按双槽普通 pinned enqueue 计算。动态输入向上取整到 1 秒 bucket，避免每个任意 sample 数触发 shape 切换。请求传二进制 PCM16，不传 JSON/base64；解码和重采样尽量放上游。服务启动时加载 plan、捕获 graph 并 warmup 所有路由 bucket，健康检查至少验证 2s/10s/16s shape。记录 `decode_ms`、`queue_ms`、`h2d_ms`、`gpu_ms`、`postprocess_ms`、端到端 p50/p95/p99、队列深度、拒绝数和 GPU 显存。
 
 `diarizen-trt1010` 中的 ORT 1.18 CUDA provider 会因缺少 `libcudnn.so.8` 回退 CPU，所以 ORT CUDA 回退必须运行在现有 `diarizen` 环境的独立进程/容器，不能在主 TensorRT 进程内假设 CUDA EP 可用。TensorRT plan 与 TRT 版本/GPU 架构绑定；GPU 型号或 TensorRT 大版本变化时从 ONNX 重建。
 
-以上 514ms 是 GPU-only 的 50 条最坏输入突发 p95，不含网络、音频解码、排队前端和后处理。成本公式为：`每请求 GPU 成本 ≈ L4 每小时价格 / 336600`（按 93.5 req/s 满载理论值）；生产按 80% 水位则用 `L4 每小时价格 / 269300`。如果到达率长期低于约 74.8 RPS，一张 L4 是最低成本方案；若硬性要求 50 条同时到达的端到端 p95 显著低于约 0.5s，则必须增加 L4 副本。
+最终完整 pinned 链路的 50 条最坏输入总完成 p95 为 547.3ms、请求完成 p95 mean 为 522.2ms，均为 GPU-only，不含网络、音频解码、排队前端和后处理。满载理论成本公式为：`每请求 GPU 成本 ≈ L4 每小时价格 / 330900`；按 73 RPS admission 的生产口径使用 `L4 每小时价格 / 262800`。如果到达率长期低于 73 RPS，一张 L4 是最低成本方案；若硬性要求 50 条同时到达的端到端 p95 显著低于约 0.55s，则必须增加 L4 副本。
 
 ---
 
@@ -694,6 +790,77 @@ CUDA_VISIBLE_DEVICES=0 /root/miniforge3/bin/conda run --no-capture-output \
   --workspace-gb 8 --warmup 10 --repeats 100
 ```
 
+### 11.8 L4 固定 16 秒进一步加速
+
+```bash
+MODEL_DIR=inference/models/kaldi_merged_1219_all_ft_large
+ENGINE=$MODEL_DIR/trt_l4_trt1010_16s/segmentation_16s_bs1_fp16.plan
+
+# TensorRT enqueue / pinned I/O / 直接 CUDA Runtime Graph
+flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 \
+  /root/miniforge3/bin/conda run --no-capture-output \
+  -n diarizen-trt1010 python inference/benchmark_l4_runtime_acceleration.py \
+  --engine "$ENGINE" --warmup 30 --repeats 200 \
+  --out-json "$MODEL_DIR/epoch_0016_l4_runtime_acceleration_fixed16s.json"
+
+# 生产参考 runner：完整 pinned H2D -> TRT -> pinned D2H graph
+# artifact 可由 ORT 脚本的 --artifact-npz 生成
+flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 \
+  /root/miniforge3/bin/conda run --no-capture-output \
+  -n diarizen-trt1010 python inference/tensorrt_cuda_graph_runner.py \
+  --engine "$ENGINE" --artifact /tmp/diarizen_fixed16s_artifact.npz \
+  --warmup 20 --repeats 200 \
+  --out "$MODEL_DIR/epoch_0016_l4_trt_production_runner_fixed16s.json"
+
+# builder optimization/workspace/aux-stream 搜索
+flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 \
+  /root/miniforge3/bin/conda run --no-capture-output \
+  -n diarizen-trt1010 python inference/benchmark_trt_builder_search.py \
+  --onnx "$MODEL_DIR/epoch_0016_multilabel_hard.onnx" \
+  --baseline-engine "$ENGINE" \
+  --engine-dir "$MODEL_DIR/trt_l4_trt1010_16s_builder_search" \
+  --out-json "$MODEL_DIR/epoch_0016_l4_trt_builder_search_fixed16s.json"
+
+# 50 请求：单/双 context、enqueue/graph/pinned/hybrid 交错对照
+flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 \
+  /root/miniforge3/bin/conda run --no-capture-output \
+  -n diarizen-trt1010 python inference/benchmark_trt_online_burst_acceleration.py \
+  --engine "$ENGINE" --requests 50 --streams 1,2 \
+  --modes enqueue_device,cudagraph_device,hybrid_device,enqueue_pinned_e2e,cudagraph_pinned_e2e,hybrid_pinned_e2e \
+  --warmup-bursts 3 --repeats 30 \
+  --out-json "$MODEL_DIR/epoch_0016_l4_trt1010_fp16_16s_burst50_hybrid.json"
+
+# 最终生产容量口径：双 context、完整 pinned I/O
+flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 \
+  /root/miniforge3/bin/conda run --no-capture-output \
+  -n diarizen-trt1010 python inference/benchmark_trt_online_burst_acceleration.py \
+  --engine "$ENGINE" --requests 50 --streams 2 \
+  --modes enqueue_pinned_e2e,cudagraph_pinned_e2e \
+  --warmup-bursts 3 --repeats 30 \
+  --out-json "$MODEL_DIR/epoch_0016_l4_trt1010_fp16_16s_burst50_final_capacity.json"
+
+# ORT CUDA Graph + IOBinding；在 diarizen 环境执行
+flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 \
+  /root/miniforge3/bin/conda run --no-capture-output \
+  -n diarizen python inference/benchmark_ort_cuda_graph_fixed16s.py \
+  --onnx "$MODEL_DIR/epoch_0016_multilabel_hard.onnx" \
+  --warmup 20 --repeats 100 --artifact-npz /tmp/diarizen_fixed16s_artifact.npz \
+  --out-json "$MODEL_DIR/epoch_0016_l4_ort_cuda_graph_fixed16s.json"
+
+# PyTorch eager/AMP/SDPA/compile 固定 16 秒；各 mode 分别执行
+flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 \
+  /root/miniforge3/bin/conda run --no-capture-output \
+  -n diarizen python inference/benchmark_pytorch_compile_fixed16s.py \
+  --mode compile_reduce_overhead_sdpa_amp_fp16 --warmup 10 --repeats 50 \
+  --out "$MODEL_DIR/diarizen_pytorch_compile_reduce_overhead_sdpa_amp_fp16_fixed16s.json"
+
+flock /tmp/diarizen_l4_benchmark.lock env CUDA_VISIBLE_DEVICES=0 \
+  /root/miniforge3/bin/conda run --no-capture-output \
+  -n diarizen python inference/benchmark_attention_sdpa_fixed16s.py \
+  --warmup 10 --repeats 50 \
+  --out-json "$MODEL_DIR/diarizen_attention_fixed16s.json"
+```
+
 ---
 
 ## 12. 产物与脚本索引
@@ -715,6 +882,14 @@ CUDA_VISIBLE_DEVICES=0 /root/miniforge3/bin/conda run --no-capture-output \
 | `inference/tensorrt_l4_requirements.txt` | TensorRT 10.10 与 CUDA runtime 精确版本锁定 |
 | `inference/validate_tensorrt_l4_conda.py` | 在 Conda env 中执行全部 28 个 engine，并检查 parity 与重复执行确定性 |
 | `inference/analyze_trt_engine_inspectors.py` | 汇总 Q/DQ、Reformat、datatype 和低精度 MatMul/Gemm 命中率 |
+| `inference/benchmark_l4_runtime_acceleration.py` | 固定 16s TensorRT enqueue、预分配、pinned I/O 与直接 CUDA Runtime Graph 配对 benchmark |
+| `inference/tensorrt_cuda_graph_runner.py` | 不依赖 PyTorch 的完整 H2D→TRT→D2H CUDA Graph 生产参考 runner |
+| `inference/benchmark_trt_builder_search.py` | O3/O4/O5、workspace、auxiliary stream 的 16s builder/tactic 搜索 |
+| `inference/benchmark_trt_online_burst_acceleration.py` | 50 请求、单/双 context 的 enqueue/graph/pinned/hybrid 交错 benchmark |
+| `inference/benchmark_ort_cuda_graph_fixed16s.py` | ORT session.run、IOBinding 与 CUDA Graph 固定 16s 对照 |
+| `inference/benchmark_pytorch_compile_fixed16s.py` | PyTorch eager/AMP/SDPA、三种 compile mode 及两种真实 compile+SDPA 组合的固定 16s 对照 |
+| `inference/benchmark_attention_sdpa_fixed16s.py` | WavLM/Conformer attention manual/auto/forced-Flash 微基准 |
+| `inference/tests/test_benchmark_l4_runtime_acceleration.py` | runtime benchmark 的统计、graph 判定和参数单元测试 |
 | `inference/quantize_segmentation_onnx_static.py` | Static INT8 QDQ 量化 |
 | `inference/run_export_kaldi_merged_1219_all_ft_large_epoch_0002.sh` | ONNX 导出 |
 
@@ -739,6 +914,15 @@ CUDA_VISIBLE_DEVICES=0 /root/miniforge3/bin/conda run --no-capture-output \
 | `epoch_0016_l4_trt1010_fp16_16s_burst50_memory.json` | 1/2 contexts 的短复测与设备内存占用 |
 | `epoch_0016_l4_trt1010_fp16_dynamic_duration_bs1.json` | batch=1 动态 2–16s profile 的逐时长结果 |
 | `epoch_0016_l4_ort_fp32_synthetic16s_reference.json` | 固定 16s ORT CPU FP32 synthetic reference 元数据 |
+| `epoch_0016_l4_runtime_acceleration_fixed16s.json` | TensorRT 预分配、pinned I/O 与有效 CUDA Graph 的 200 次配对结果 |
+| `epoch_0016_l4_trt_production_runner_fixed16s.json` | 独立 libcudart 完整数据链路 graph 的节点、延迟、host enqueue 与 parity |
+| `epoch_0016_l4_trt_builder_search_fixed16s.json` | O3/O4/O5、8/16GiB workspace、aux stream 搜索与选型 |
+| `epoch_0016_l4_trt1010_fp16_16s_burst50_cudagraph.json` | 1/2 context 的 enqueue/graph 与 pinned I/O 配对结果 |
+| `epoch_0016_l4_trt1010_fp16_16s_burst50_hybrid.json` | 双 context 六模式同轮交错复核，排除 hybrid 偶然收益 |
+| `epoch_0016_l4_trt1010_fp16_16s_burst50_final_capacity.json` | 带 engine SHA/环境元数据、由 `flock` 串行执行的最终双 context pinned 容量口径 |
+| `epoch_0016_l4_ort_cuda_graph_fixed16s.json` | ORT session.run/IOBinding/CUDA Graph 固定 16s 对照及 EP profile |
+| `diarizen_pytorch_{eager,sdpa,compile}_*_fixed16s.json` | PyTorch FP32/AMP/SDPA/compile 固定 16s 分项结果（含两种 compile+SDPA，共 9 个 JSON） |
+| `diarizen_attention_fixed16s.json` | WavLM/Conformer SDPA kernel 微基准 |
 
 ### 12.3 本地模型文件（**.gitignore 排除，不入库**）
 
@@ -768,9 +952,12 @@ CUDA_VISIBLE_DEVICES=0 /root/miniforge3/bin/conda run --no-capture-output \
 5. **TensorRT FP16 是全精度实测冠军**：FP8/INT8 确实命中低精度层，但分别慢约 11–26% / 3–13%；INT8 synthetic 精度严重失真且重复执行非完全确定。
 6. **INT4/FP4 不适合 L4**：INT4 仅压缩部分权重、实际 Float 计算且更慢；FP4 需要 Blackwell，Ada L4 不支持。
 7. **线上最长 16s 时仍选 FP16 batch=1**：10.741ms/条；batch=32 每条 17.021ms，吞吐反而下降 36.9%。
-8. **并发 50 使用两个 contexts**：50 条最坏输入总完成约 534.8ms，请求完成 p95 约 514.3ms，吞吐约 93.5 req/s；4/8 contexts 更慢。
-9. **一张 L4 是最低成本起点**：按 80% 水位承接约 74.8 个最坏 16s 请求/秒；更高持续到达率或更低突发 p95 SLA 才扩卡。
+8. **并发 50 使用两个 contexts**：最终完整 pinned 链路 50 条总完成 mean/p95 约 543.9/547.3ms，请求完成 p95 约 522.2ms，吞吐约 91.9 req/s；4/8 contexts 更慢。
+9. **一张 L4 是最低成本起点**：admission 向下取整为 73 个最坏 16s 请求/秒；更高持续到达率或更低突发 p95 SLA 才扩卡。
 10. **时长路由避免无谓补零**：动态 2–16s plan 配合固定 10s/16s plan；不使用大 batch 或当前 INT8/FP8/INT4 路线。
+11. **CUDA Graph 有小而稳定的单槽收益**：完整 16s 数据链路 mean/p95 改善约 2.6%/2.9%，host enqueue 降至约 8µs；双槽六模式差异约 0.21%，不采用复杂 hybrid 调度。
+12. **builder 深搜没有更好 plan**：O4/O5、16GiB workspace、aux streams 均未同时改善 mean/p95；继续使用 O3/8GiB。
+13. **非 TensorRT 路径也已测完**：ORT CUDA Graph 只改善 2.09% 且仍慢 3.54×；真正的 PyTorch reduce-overhead+SDPA+AMP 比 eager AMP 快 2.12×，但仍慢 1.72×。二者都是可选/实验性回退，不是主后端；全零 hard parity 不能替代真实验收。
 
 ### 13.2 收尾状态与外部约束
 
@@ -783,7 +970,11 @@ CUDA_VISIBLE_DEVICES=0 /root/miniforge3/bin/conda run --no-capture-output \
 | 固定 16s 容量与 batch 扫描 | ✅ 完成 | FP16 bs=1/2/4/8/16/32，均 50 次计时 |
 | 并发 50 调度扫描 | ✅ 完成 | batch=1 的 1/2/4/8 contexts；2 contexts 最佳 |
 | 动态时长与路由切点 | ✅ 完成 | 2/4/6/8/10/12/13/14/16s synthetic 测速 |
-| 真实音频 DER/JER | 按约束不执行 | 用户明确要求只跑 10 秒 synthetic，不跑真实音频 |
+| TensorRT runtime / CUDA Graph | ✅ 完成 | 16s enqueue/pinned/graph、独立 libcudart runner、graph 节点与 exact parity |
+| TensorRT builder/tactic 搜索 | ✅ 完成 | O3/O4/O5、8/16GiB、aux=0/2；没有候选替换现有 plan |
+| ORT / PyTorch / SDPA 加速 | ✅ 完成 | 16s ORT CUDA Graph、PyTorch AMP/SDPA/compile 和 attention kernel 微基准 |
+| 双 context graph/hybrid 复核 | ✅ 完成 | 6 种模式同轮正逆序交错；差异约 0.21%，不宣称 hybrid 收益 |
+| 真实音频 DER/JER | 按约束不执行 | 用户最终口径为只跑固定 16 秒 synthetic，不跑真实音频 |
 | SmoothQuant alpha 扫描 | 当前工具链不具备 | ModelOpt 0.46 ONNX 无 SmoothQuant；需要新增图变换或训练工具链，且普通 INT8 已精度失败并非确定 |
 | 部署镜像/注册表推送 | 无目标可执行 | 尚未提供镜像仓库、服务入口或部署目标；环境脚本与 engines 已就绪 |
 

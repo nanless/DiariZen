@@ -29,6 +29,7 @@ def build_engine(
     min_batch_size: int | None = None,
     opt_batch_size: int | None = None,
     max_batch_size: int | None = None,
+    max_aux_streams: int | None = None,
 ) -> float:
     logger = trt.Logger(trt.Logger.WARNING)
     builder = trt.Builder(logger)
@@ -46,6 +47,10 @@ def build_engine(
     config = builder.create_builder_config()
     config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, workspace_gb << 30)
     config.builder_optimization_level = optimization_level
+    if max_aux_streams is not None:
+        if max_aux_streams < 0:
+            raise ValueError("max_aux_streams must be >= 0")
+        config.max_aux_streams = max_aux_streams
     config.profiling_verbosity = trt.ProfilingVerbosity.DETAILED
     if precision == "fp32":
         config.clear_flag(trt.BuilderFlag.TF32)
