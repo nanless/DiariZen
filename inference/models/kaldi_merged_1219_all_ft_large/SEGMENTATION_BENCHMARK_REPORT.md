@@ -5,6 +5,8 @@
 > **测试日期**：2026-08-26～2026-08-27<br>
 > **测试 GPU**：NVIDIA A800-SXM4-80GB（历史测试）与 NVIDIA L4 24GB（固定/动态 2～30s、并发 50 复测）<br>
 > **对应线上模型**：与 `speaker_diarize_infer` 中 `epoch_0016_multilabel_hard.onnx` 为同一文件（MD5: `0a2142c0874e553206633e65b8348dd1`）
+>
+> **周报/上线评审摘要**：[L4_ONLINE_INFERENCE_WEEKLY_SUMMARY.md](./L4_ONLINE_INFERENCE_WEEKLY_SUMMARY.md)
 
 ---
 
