@@ -1,0 +1,4 @@
+interface:
+  display_name: "DiariZen L4 推理优化"
+  short_description: "DiariZen L4 TensorRT 推理诊断、压测与线上决策"
+  default_prompt: "使用 $diarizen-l4-inference-optimization 复核并优化 DiariZen segmentation 在 NVIDIA L4 上的 TensorRT 推理方案。"
